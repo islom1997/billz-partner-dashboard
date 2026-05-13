@@ -34,17 +34,18 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        st.markdown("<h2 style='text-align: center; color: #2563eb;'>BILLZ Партнёры</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #475569;'>Пожалуйста, введите ваш PIN-код</p>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
+            st.image("logo.png", width=200)
+            st.markdown("#### Партнёрский дашборд")
+            st.markdown("Пожалуйста, введите ваш PIN-код")
             st.text_input("PIN", type="password", on_change=password_entered, key="password")
-            st.caption("Тестовые PIN: 1234 (Doston), 1111 (Parviz)")
         return False
     elif not st.session_state["password_correct"]:
-        st.markdown("<h2 style='text-align: center; color: #2563eb;'>BILLZ Партнёры</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
+            st.image("logo.png", width=200)
+            st.markdown("#### Партнёрский дашборд")
             st.text_input("PIN", type="password", on_change=password_entered, key="password")
             st.error("😕 Неверный PIN-код")
         return False
@@ -179,7 +180,7 @@ def main():
     data = get_partner_data(partner_name)
 
     with st.sidebar:
-        st.markdown("<h1 style='color: #2563eb; font-weight: 800; font-size: 24px; padding-bottom: 20px;'>Z BILLZ</h1>", unsafe_allow_html=True)
+        st.image("logo.png", width=150)
         st.markdown("---")
         st.markdown(f"**{partner_name}**")
         st.caption("Магазин / Партнер")
