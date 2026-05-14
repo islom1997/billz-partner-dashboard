@@ -186,11 +186,19 @@ def draw_main_dashboard(data):
                 '05': 'Май', '06': 'Июн', '07': 'Июл', '08': 'Авг',
                 '09': 'Сен', '10': 'Окт', '11': 'Ноя', '12': 'Дек'
             }
+            monthly_df['sort_key'] = monthly_df['month']
             monthly_df['month'] = monthly_df['month'].apply(
                 lambda x: f"{month_names[x[5:]]} {x[:4]}"
             )
-            monthly_df = monthly_df.set_index('month')
-            st.line_chart(monthly_df, use_container_width=True)
+            month_order = monthly_df.sort_values('sort_key')['month'].tolist()
+            
+            import altair as alt
+            chart = alt.Chart(monthly_df).mark_line(point=True).encode(
+                x=alt.X('month:N', sort=month_order, title='Месяц'),
+                y=alt.Y('connections:Q', title='Подключения'),
+                tooltip=['month', 'connections']
+            ).properties(height=350)
+            st.altair_chart(chart, use_container_width=True)
         else:
             st.info("Нет данных для графика.")
     except Exception as e:
