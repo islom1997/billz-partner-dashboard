@@ -158,7 +158,33 @@ def draw_main_dashboard(data):
         st.metric("Подключения (всего)", data['connections'])
     with col3:
         st.metric("Новые в этом месяце", data['connections_month'])
-
+    st.write("---")
+    
+    # --- Monthly connections line chart ---
+    st.markdown("#### 📈 Подключения по месяцам")
+    first_name = data['first_name']
+    client = get_bq_client()
+    query_monthly = f"""
+    SELECT 
+        FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
+        COUNT(DISTINCT c.customer_id) as connections
+    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+        ON c.customer_id = sub.customer_id
+    WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
+      AND sub.status IN ('active', 'in_trial')
+      AND c.created_at >= TIMESTAMP_SUB(TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH), INTERVAL 12 MONTH)
+    GROUP BY month
+    ORDER BY month
+    """
+    monthly_df = client.query(query_monthly).to_dataframe()
+    
+    if not monthly_df.empty:
+        monthly_df = monthly_df.set_index('month')
+        st.line_chart(monthly_df, y='connections', use_container_width=True)
+    else:
+        st.info("Нет данных для графика.")
+    
     st.write("---")
     st.markdown(f"#### 🆕 Новые клиенты в этом месяце ({data['connections_month']})")
     sdf = data["success_df"]
