@@ -169,6 +169,54 @@ def draw_main_dashboard(data):
         st.dataframe(display_sdf, use_container_width=True, hide_index=True)
     else:
         st.info("В этом месяце пока нет новых клиентов.")
+    
+    # --- Partner Leaderboard ---
+    st.write("---")
+    st.markdown("#### 🏆 Рейтинг партнёров")
+    
+    client = get_bq_client()
+    query_leaderboard = """
+    SELECT 
+        c.cf_support_manager as partner,
+        COUNT(DISTINCT c.customer_id) as total_clients,
+        SUM(sub.mrr) / 100 as total_mrr,
+        COUNT(DISTINCT CASE WHEN c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH) 
+              THEN c.customer_id END) as new_this_month
+    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+        ON c.customer_id = sub.customer_id
+    WHERE sub.status IN ('active', 'in_trial')
+      AND c.cf_support_manager IS NOT NULL
+      AND c.cf_support_manager != ''
+      AND LOWER(c.cf_support_manager) LIKE '%partner%'
+    GROUP BY c.cf_support_manager
+    ORDER BY total_clients DESC
+    """
+    lb_df = client.query(query_leaderboard).to_dataframe()
+    
+    if not lb_df.empty:
+        lb_df.insert(0, 'rank', range(1, len(lb_df) + 1))
+        
+        # Find current partner's row
+        partner_first = data['first_name'].lower()
+        lb_df['is_me'] = lb_df['partner'].apply(lambda x: partner_first in x.lower())
+        my_rank = lb_df[lb_df['is_me']]['rank'].values
+        if len(my_rank) > 0:
+            st.markdown(f"Ваше место: **#{my_rank[0]}** из {len(lb_df)}")
+        
+        # Format for display
+        display_lb = lb_df[['rank', 'partner', 'total_clients', 'new_this_month', 'total_mrr']].copy()
+        display_lb.columns = ["#", "Партнёр", "Всего клиентов", "Новые (этот мес.)", "MRR (UZS)"]
+        display_lb["MRR (UZS)"] = display_lb["MRR (UZS)"].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
+        
+        # Highlight current partner's row
+        def highlight_me(row):
+            if partner_first in str(lb_df.iloc[row.name]['partner']).lower():
+                return ['background-color: #1e3a5f'] * len(row)
+            return [''] * len(row)
+        
+        styled = display_lb.style.apply(highlight_me, axis=1)
+        st.dataframe(styled, use_container_width=True, hide_index=True)
 
 
 # --- ADMIN DASHBOARD ---
