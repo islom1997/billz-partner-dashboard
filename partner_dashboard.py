@@ -223,27 +223,6 @@ def draw_leaderboard(data):
         st.dataframe(display_new.style.apply(highlight_new, axis=1), use_container_width=True, hide_index=True)
     else:
         st.info("В этом месяце пока нет продаж.")
-    
-    st.write("---")
-    
-    # --- Ranking by TOTAL clients ---
-    st.markdown("#### 📊 По общему числу клиентов")
-    total_df = lb_df.sort_values('total_clients', ascending=False).reset_index(drop=True)
-    total_df.insert(0, 'rank', range(1, len(total_df) + 1))
-    
-    my_rank_total = total_df[total_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
-    if len(my_rank_total) > 0:
-        st.markdown(f"Ваше место: **#{my_rank_total[0]}** из {len(total_df)}")
-    
-    display_total = total_df[['rank', 'partner', 'total_clients']].copy()
-    display_total.columns = ["#", "Партнёр", "Всего клиентов"]
-    
-    def highlight_total(row):
-        if partner_first in str(total_df.iloc[row.name]['partner']).lower():
-            return ['background-color: #1e3a5f'] * len(row)
-        return [''] * len(row)
-    
-    st.dataframe(display_total.style.apply(highlight_total, axis=1), use_container_width=True, hide_index=True)
 
 
 # --- ADMIN DASHBOARD ---
