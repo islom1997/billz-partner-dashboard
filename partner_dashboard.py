@@ -196,6 +196,7 @@ def draw_admin_dashboard():
       AND c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
       AND c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
+      AND LOWER(c.cf_support_manager) LIKE '%partner%'
     """
     active_partners_df = client.query(query_active_partners).to_dataframe()
     active_partners_count = len(active_partners_df)
@@ -226,6 +227,7 @@ def draw_admin_dashboard():
     WHERE sub.status = 'active'
       AND c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
+      AND LOWER(c.cf_support_manager) LIKE '%partner%'
     GROUP BY c.cf_support_manager
     """
     avg_conn_df = client.query(query_avg_connections).to_dataframe()
