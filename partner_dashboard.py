@@ -181,6 +181,14 @@ def draw_main_dashboard(data):
     try:
         monthly_df = client.query(query_monthly).to_dataframe()
         if not monthly_df.empty:
+            month_names = {
+                '01': 'Янв', '02': 'Фев', '03': 'Мар', '04': 'Апр',
+                '05': 'Май', '06': 'Июн', '07': 'Июл', '08': 'Авг',
+                '09': 'Сен', '10': 'Окт', '11': 'Ноя', '12': 'Дек'
+            }
+            monthly_df['month'] = monthly_df['month'].apply(
+                lambda x: f"{month_names[x[5:]]} {x[:4]}"
+            )
             monthly_df = monthly_df.set_index('month')
             st.line_chart(monthly_df, use_container_width=True)
         else:
