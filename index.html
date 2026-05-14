@@ -1,0 +1,1685 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BILLZ · Партнёрский Дашборд</title>
+<script>
+  // применяем тему ДО рендера, чтобы не было вспышки
+  (function(){ try{ var t=localStorage.getItem('billz.theme')||'dark'; document.documentElement.setAttribute('data-theme',t); }catch(e){} })();
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ───── DARK (default) ───── */
+  :root{
+    --bg:#0b0f17; --panel:#111826; --panel2:#0f1624; --line:#1f2937;
+    --txt:#e5e7eb; --muted:#94a3b8;
+    --chip-bg:#1e293b; --chip-tx:#cbd5e1; --chip-bd:#243149;
+    --bar-bg:#1e293b;
+    --tab-tx:#94a3b8; --tab-active-bg:#111c2e; --tab-active-tx:#f1f5f9; --tab-active-bd:#243149;
+    --input-bg:#0f1624; --input-bd:#243149; --input-tx:#e5e7eb;
+    --btn-bg:#1e293b; --btn-bd:#243149; --btn-tx:#e5e7eb; --btn-hover:#243149;
+    --btn-pri-bg:#1e40af; --btn-pri-bd:#1d4ed8; --btn-pri-hover:#1d4ed8;
+    --funnel-bg:#0f1c33;
+    --gate-bg:rgba(2,6,17,.85);
+    --shadow:0 10px 30px rgba(0,0,0,.5);
+    --row-active:#1e293b;
+    --slate-400:#94a3b8; --slate-500:#64748b; --slate-300:#cbd5e1;
+    --emerald:#34d399; --amber:#fbbf24; --red:#fca5a5;
+    --err-bg:#1a0d0d; --err-bd:#7f1d1d;
+    --warn-bg:#1a1407; --warn-bd:#7c5b08; --warn-tx:#fcd34d;
+  }
+  /* ───── LIGHT ───── */
+  html[data-theme="light"]{
+    --bg:#f6f8fb; --panel:#ffffff; --panel2:#f9fafb; --line:#e5e7eb;
+    --txt:#0f172a; --muted:#475569;
+    --chip-bg:#f1f5f9; --chip-tx:#334155; --chip-bd:#e2e8f0;
+    --bar-bg:#e2e8f0;
+    --tab-tx:#64748b; --tab-active-bg:#ffffff; --tab-active-tx:#0f172a; --tab-active-bd:#e2e8f0;
+    --input-bg:#ffffff; --input-bd:#cbd5e1; --input-tx:#0f172a;
+    --btn-bg:#f1f5f9; --btn-bd:#e2e8f0; --btn-tx:#0f172a; --btn-hover:#e2e8f0;
+    --btn-pri-bg:#2563eb; --btn-pri-bd:#1d4ed8; --btn-pri-hover:#1d4ed8;
+    --funnel-bg:#eff6ff;
+    --gate-bg:rgba(15,23,42,.45);
+    --shadow:0 10px 30px rgba(15,23,42,.12);
+    --row-active:#eff6ff;
+    --slate-400:#475569; --slate-500:#64748b; --slate-300:#334155;
+    --emerald:#059669; --amber:#b45309; --red:#dc2626;
+    --err-bg:#fee2e2; --err-bd:#fca5a5;
+    --warn-bg:#fef3c7; --warn-bd:#fcd34d; --warn-tx:#92400e;
+  }
+  html[data-theme="light"] .lvl-1{background:#f1f5f9;color:#334155}
+  html[data-theme="light"] .lvl-2{background:#dbeafe;color:#1e40af}
+  html[data-theme="light"] .lvl-3{background:#e0e7ff;color:#4338ca}
+  html[data-theme="light"] .lvl-4{background:#f3e8ff;color:#7e22ce}
+  /* lvl-5 в светлой тоже градиент — оставляем */
+
+  /* Переопределения утилитарных tailwind-классов под тему */
+  html[data-theme="light"] .text-slate-400{color:var(--slate-400)!important}
+  html[data-theme="light"] .text-slate-500{color:var(--slate-500)!important}
+  html[data-theme="light"] .text-slate-300{color:var(--slate-300)!important}
+  html[data-theme="light"] .text-slate-200{color:#1e293b!important}
+  html[data-theme="light"] .text-emerald-400{color:#059669!important}
+  html[data-theme="light"] .text-amber-300{color:#b45309!important}
+  html[data-theme="light"] .text-red-400{color:#dc2626!important}
+  html[data-theme="light"] .border-slate-800{border-color:#e5e7eb!important}
+  html[data-theme="light"] .border-slate-700{border-color:#e5e7eb!important}
+  html[data-theme="light"] .bg-slate-800{background:#eff6ff!important}
+  html[data-theme="light"] .hover\:border-slate-600:hover{border-color:#94a3b8!important}
+  html[data-theme="light"] .hover\:text-slate-200:hover{color:#0f172a!important}
+
+  html,body{background:var(--bg);color:var(--txt);transition:background .2s, color .2s}
+  body{font-family:-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  .panel2{background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+  .chip{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .6rem;border-radius:999px;font-size:.72rem;background:var(--chip-bg);color:var(--chip-tx);border:1px solid var(--chip-bd)}
+  .chip-g{background:#052e1f;color:#34d399;border-color:#064e3b}
+  .chip-y{background:#3a2e07;color:#fbbf24;border-color:#7c5b08}
+  .chip-r{background:#3a0d10;color:#fca5a5;border-color:#7f1d1d}
+  .chip-b{background:#0c1d3b;color:#93c5fd;border-color:#1e3a8a}
+  html[data-theme="light"] .chip-g{background:#d1fae5;color:#065f46;border-color:#a7f3d0}
+  html[data-theme="light"] .chip-y{background:#fef3c7;color:#92400e;border-color:#fde68a}
+  html[data-theme="light"] .chip-r{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+  html[data-theme="light"] .chip-b{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
+  .bar{height:10px;background:var(--bar-bg);border-radius:999px;overflow:hidden}
+  .bar>div{height:100%;border-radius:999px;background:linear-gradient(90deg,#22c55e,#10b981)}
+  .bar.warn>div{background:linear-gradient(90deg,#eab308,#f59e0b)}
+  .bar.crit>div{background:linear-gradient(90deg,#ef4444,#dc2626)}
+  .bar.blue>div{background:linear-gradient(90deg,#3b82f6,#6366f1)}
+  .tab{padding:.55rem .9rem;border-radius:10px;color:var(--tab-tx);cursor:pointer;font-weight:500;font-size:.85rem;white-space:nowrap}
+  .tab.active{background:var(--tab-active-bg);color:var(--tab-active-tx);border:1px solid var(--tab-active-bd)}
+  .lvl-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600}
+  .lvl-1{background:#1e293b;color:#cbd5e1}
+  .lvl-2{background:#0c4a6e;color:#7dd3fc}
+  .lvl-3{background:#312e81;color:#a5b4fc}
+  .lvl-4{background:#581c87;color:#d8b4fe}
+  .lvl-5{background:linear-gradient(135deg,#f59e0b,#dc2626);color:#fff}
+  .top1{background:linear-gradient(135deg,#fbbf24 0%,#d97706 100%);color:#1f2937;border:none}
+  .top2{background:linear-gradient(135deg,#cbd5e1 0%,#64748b 100%);color:#0f172a;border:none}
+  .top3{background:linear-gradient(135deg,#fdba74 0%,#9a3412 100%);color:#fff;border:none}
+  .scroll-x{overflow-x:auto}
+  .scroll-x::-webkit-scrollbar{height:6px}
+  .scroll-x::-webkit-scrollbar-thumb{background:var(--chip-bd);border-radius:4px}
+  .num{font-variant-numeric:tabular-nums}
+  details>summary{cursor:pointer;list-style:none}
+  details>summary::-webkit-details-marker{display:none}
+  .funnel-step{position:relative;padding:.85rem 1rem;border-radius:10px;background:var(--funnel-bg)}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--panel);border:1px solid var(--chip-bd);padding:.6rem 1rem;border-radius:10px;box-shadow:var(--shadow);z-index:50;font-size:.85rem;color:var(--txt)}
+  .gate{position:fixed;inset:0;background:var(--gate-bg);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:40}
+  input,select{background:var(--input-bg);border:1px solid var(--input-bd);color:var(--input-tx);border-radius:8px;padding:.45rem .7rem;font-size:.85rem}
+  input:focus,select:focus{outline:none;border-color:#3b82f6}
+  button.btn{background:var(--btn-bg);border:1px solid var(--btn-bd);color:var(--btn-tx);border-radius:8px;padding:.45rem .9rem;font-size:.85rem;cursor:pointer;transition:all .15s}
+  button.btn:hover{background:var(--btn-hover)}
+  button.btn-pri{background:var(--btn-pri-bg);border-color:var(--btn-pri-bd);color:#fff}
+  button.btn-pri:hover{background:var(--btn-pri-hover)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .grid-cards{display:grid;gap:.75rem}
+  @media(min-width:640px){.grid-cards{grid-template-columns:repeat(2,1fr)}}
+  @media(min-width:1024px){.grid-cards{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:1280px){.grid-cards{grid-template-columns:repeat(4,1fr)}}
+  /* Leads tab */
+  .zone-header{font-size:.85rem;font-weight:600;padding:.5rem 0;margin-top:1rem;display:flex;align-items:center;gap:.5rem;color:var(--txt)}
+  .zone-header:first-of-type{margin-top:0}
+  .leads-fchip{padding:.3rem .7rem;border-radius:999px;font-size:.75rem;cursor:pointer;border:1px solid var(--chip-bd);background:var(--chip-bg);color:var(--tab-tx);white-space:nowrap;transition:all .12s}
+  .leads-fchip:hover{border-color:var(--tab-active-bd)}
+  .leads-fchip.active{background:var(--tab-active-bg);color:var(--tab-active-tx);border-color:var(--tab-active-bd)}
+  .leads-card-sel{border-color:#3b82f6!important;box-shadow:0 0 0 1px #3b82f6}
+  .zone-no-sales .zone-header{color:#fca5a5}
+</style>
+</head>
+<body class="min-h-screen">
+<div id="app">
+  <header class="border-b sticky top-0 z-30" style="border-color:var(--line);background:var(--panel2)">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-red-600 grid place-items-center font-bold text-slate-900">B</div>
+        <div>
+          <div class="font-semibold text-sm leading-tight">BILLZ Партнёры</div>
+          <div class="text-[11px] text-slate-400 leading-tight" id="period">Май 2026</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 ml-auto flex-wrap">
+        <select id="partnerSel" class="min-w-[200px]"></select>
+        <button class="btn" id="themeBtn" title="Переключить тему">🌙</button>
+        <button class="btn" id="refreshBtn">↻ Обновить</button>
+        <button class="btn" id="snapshotBtn" title="Сохранить снимок баллов в Google Sheets">📸 Снимок</button>
+        <button class="btn" id="execBtn" title="Executive Summary">🔒</button>
+      </div>
+    </div>
+    <nav class="max-w-7xl mx-auto px-4 pb-2 flex gap-1 scroll-x">
+      <div class="tab active" data-tab="main">Главная</div>
+      <div class="tab" data-tab="stats">Статистика</div>
+      <div class="tab" data-tab="leads">Лиды</div>
+      <div class="tab" data-tab="forecast">План / Прогноз</div>
+      <div class="tab" data-tab="scoring">Баллы</div>
+      <div class="tab" data-tab="daily">Daily ввод</div>
+    </nav>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-5">
+    <div id="loadingBanner" class="panel p-4 mb-4 text-sm text-slate-400" style="display:none">⏳ Загрузка данных из Google Sheets…</div>
+    <div id="errorBanner" class="panel p-4 mb-4 text-sm" style="display:none;border-color:var(--err-bd);background:var(--err-bg)">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div><span style="color:var(--red)">⚠️ Не удалось обновить данные.</span> <span id="errorMsg" class="text-slate-400"></span></div>
+        <button class="btn" onclick="App.load()">Повторить</button>
+      </div>
+    </div>
+    <div id="staleBanner" class="panel p-3 mb-4 text-xs" style="display:none;border-color:var(--warn-bd);background:var(--warn-bg);color:var(--warn-tx)">
+      Показаны данные от <span id="staleTime"></span> · обновление не удалось
+    </div>
+
+    <section id="tab-main"></section>
+    <section id="tab-stats" style="display:none"></section>
+    <section id="tab-leads" style="display:none"></section>
+    <section id="tab-forecast" style="display:none"></section>
+    <section id="tab-scoring" style="display:none"></section>
+    <section id="tab-daily" style="display:none"></section>
+  </main>
+
+  <footer class="text-center text-xs text-slate-500 py-6">
+    BILLZ Партнёрский дашборд · v2 · <span id="updatedAt">—</span>
+  </footer>
+</div>
+
+<div id="execGate" class="gate" style="display:none">
+  <div class="panel p-6 w-[320px]">
+    <div class="text-base font-semibold mb-1">🔒 Executive Summary</div>
+    <div class="text-xs text-slate-400 mb-4">Закрытая управленческая сводка</div>
+    <input id="execPwd" type="password" placeholder="Пароль" class="w-full mb-3" />
+    <div class="flex gap-2">
+      <button class="btn flex-1" onclick="document.getElementById('execGate').style.display='none'">Отмена</button>
+      <button class="btn btn-pri flex-1" onclick="App.tryExecLogin()">Войти</button>
+    </div>
+    <div id="execErr" class="text-red-400 text-xs mt-2" style="display:none">Неверный пароль</div>
+  </div>
+</div>
+
+<div id="toast" class="toast" style="display:none"></div>
+
+<script>
+/* =========================================================
+   КОНФИГ
+   ========================================================= */
+const CFG = {
+  API_KEY: 'AIzaSyByFSWE5tzWzuWyV1Ol9QhFrZkj_q2QqMc',
+  SHEET_FACT: '1kxvrAMctZkbcgPv5rEo3u9tx_0RgLKSw4J5MoO83LpM',
+  SHEET_LEADS: '1NDyL6nThOYE5eVNEqFH2ijm_kPRuHl02pxwLS14o4ps',
+  CURRENT_MONTH_TAB: 'Май 26',
+  WORKING_DAYS_DEFAULT: 22,
+  EXEC_PASSWORD: 'billz2026',
+  POINTS_MRR_BASE: 380000,
+  POINTS_PER_CONNECTION: 50,
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwUIdJ0l4mYFxWG4xKvZizlPy0DvIS5K-RcAmPbXMgurmIgS7Zza8ixMCYtw19sCuckuw/exec',
+  SHEET_POINTS: '1t959Ikwx6uxojrEC4VnjOP_HXDGLhh3G2ahoCRb6684',
+};
+
+const HQ_CONNECTED_STATUSES = new Set(['Подключили','Сделка успешна','Тестовый']);
+const HQ_ACTIVATED_STATUSES = new Set(['Сделка успешна','Тестовый']);
+const HQ_PAID_STATUSES      = new Set(['Сделка успешна']);
+const HQ_LOST_STATUSES      = new Set(['Не подходит','AE недопродал','Слив','Отказ']);
+const SQL_TRIAL_STATUSES = new Set(['Актив','Тестовый','Подключили','Подключение','Сделка успешна']);
+const SQL_PAID_STATUSES  = new Set(['Сделка успешна','Актив']);
+
+const PARTNER_ALIASES = {
+  'технопос':                   ['салык (технопос)','технопос','texnopos'],
+  'khafizov parviz':             ['parviz','khafizov parviz'],
+  'хикматилло бахтиёров':        ['хикматилло бахтиёров','хикматилло'],
+  'бобур абдукаххоров':          ['бобур'],
+  'иброхимов сардор':            ['sardor ibrokhimov','sardor','иброхимов'],
+  'маруфхон баходирхонов':       ['marufhon nam','маруфхон'],
+  'саидакбар':                   ['саидакбар'],
+  'нурсултан джавлиев':          ['нурсултан','нурсултон'],
+  "ulug'bek salimov":            ['ulugbek salimov',"ulug'bek salimov",'улугбек'],
+  'nexpos':                      ['nexpos'],
+  'мухтасибов элнур':            ['mukhtasibov ilnur','мухтасибов'],
+  'нозимжон ахунжанов':          ['nozimjon','нозимжон'],
+  'shaxobiddinov javlonbek':     ['шахобиддинов жавлонбек','shaxobiddinov javlonbek','javlonbek'],
+  'наимжом шакиров':             ['naimjon','наимжон','наимжом'],
+  'мансур юсупов':               ['мансур','mansur'],
+  'ergashov burhon':             ['burhon ergashov','burhon','ergashov'],
+  'карабaев бобуржон':           ['карабаев','бобуржон','джизак'],
+  'алишер азимов':               ['алишер'],
+  'азамат шарипов':              ['azamat','azamat sharipov','азамат'],
+  'nodirbek yusupov':            ['nodirbek','юсупов'],
+  'бунйод бахриддинов':          ['буньёд','бунйод','bunyod'],
+  'музаффар абдувохидов':        ['музаффар','muzaffar'],
+  'жавохир ортиков':             ['javohir','жавохир'],
+  'нурали рахматов':             ['нурали'],
+  'abduvaitov odiljon':          ['odiljon','abduvaitov'],
+  'шухрат мирзакулов':           ['шухрат'],
+  'билол сайдалиев':             ['билол','bilol'],
+  'абдурауф бободжонов':         ['абдурауф'],
+  'миржон музафарав':            ['muzafarov mirjon','миржон'],
+};
+
+/* =========================================================
+   УТИЛИТЫ
+   ========================================================= */
+const U = {
+  norm(s){ return (s||'').toString().toLowerCase().replace(/[ʼ’`']/g,"'").replace(/\s+/g,' ').trim() },
+  parseUZS(s){
+    if(s==null) return 0;
+    if(typeof s==='number') return s;
+    const t = String(s).replace(/[^\d.,-]/g,'').replace(/ /g,'').replace(/,/g,'.');
+    const n = parseFloat(t);
+    return isFinite(n)?n:0;
+  },
+  parseInt0(s){ const n=parseInt(String(s||'').replace(/[^\d-]/g,''),10); return isNaN(n)?0:n; },
+  parseDate(s){
+    if(!s) return null;
+    const t = String(s).trim();
+    let m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+    m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+    const d = new Date(t); return isNaN(d)?null:d;
+  },
+  fmtUZS(n){ if(!n) return '0'; return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' сум' },
+  fmtUZSk(n){
+    if(!n) return '0';
+    if(n>=1e9) return (n/1e9).toFixed(1).replace('.0','')+' млрд';
+    if(n>=1e6) return (n/1e6).toFixed(1).replace('.0','')+' млн';
+    if(n>=1e3) return Math.round(n/1e3)+'K';
+    return String(Math.round(n));
+  },
+  pct(a,b){ if(!b) return 0; return (a/b)*100; },
+  clamp(x,a,b){ return Math.max(a,Math.min(b,x)); },
+  todayWorkingDayIndex(){
+    const now = new Date(); const y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
+    let cnt=0;
+    for(let i=1;i<=d;i++){ const dt=new Date(y,m,i); const wd=dt.getDay(); if(wd>=1&&wd<=5) cnt++; }
+    return cnt;
+  },
+  workingDaysInMonth(){
+    const now=new Date(); const y=now.getFullYear(), m=now.getMonth();
+    const last=new Date(y,m+1,0).getDate(); let cnt=0;
+    for(let i=1;i<=last;i++){ const dt=new Date(y,m,i); const wd=dt.getDay(); if(wd>=1&&wd<=5) cnt++; }
+    return cnt;
+  },
+  toast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.style.display='block';
+    clearTimeout(U._tt); U._tt=setTimeout(()=>{ t.style.display='none' },2400);
+  }
+};
+
+/* =========================================================
+   РАСЧЁТЫ (ТЗ §4) — НЕ МЕНЯТЬ ПОРОГИ
+   ========================================================= */
+const Calc = {
+  pointsConnections(count){ return Math.max(0,count|0) * CFG.POINTS_PER_CONNECTION; },
+  pointsMrr(factMrr){ if(!factMrr||factMrr<0) return 0; return Math.round(factMrr / CFG.POINTS_MRR_BASE * 50); },
+  bonusMrrPlan(factMrr,planMrr){
+    if(!planMrr||planMrr<=0) return 0;
+    const p = factMrr/planMrr;
+    if(p>=1.20) return 60;
+    if(p>=1.00) return 40;
+    if(p>=0.75) return 20;
+    if(p>=0.50) return 10;
+    return 0;
+  },
+  bonusHqConversion(transferred,connected,activated,paid){
+    let bonus=0;
+    const stages=[[transferred,connected],[connected,activated],[activated,paid]];
+    for(const [from,to] of stages){
+      if(!from) continue;
+      const cr = (to/from)*100;
+      if(cr>=80) bonus+=15;
+      else if(cr>=60) bonus+=5;
+    }
+    return bonus;
+  },
+  bonusSqlConversion(transferred,trials,paid){
+    if(!transferred) return 0;
+    let bonus=0;
+    const crT=(trials/transferred)*100;
+    const crP=(paid/transferred)*100;
+    if(crT>=60) bonus+=20; else if(crT>=40) bonus+=10;
+    if(crP>=40) bonus+=20; else if(crP>=20) bonus+=10;
+    return bonus;
+  },
+  totalPoints(p){
+    const c = this.pointsConnections(p.connections);
+    const m = this.pointsMrr(p.factMrr);
+    const bP = this.bonusMrrPlan(p.factMrr,p.planMrr);
+    const bH = this.bonusHqConversion(p.hq.transferred,p.hq.connected,p.hq.activated,p.hq.paid);
+    const bS = this.bonusSqlConversion(p.sql.transferred,p.sql.trials,p.sql.paid);
+    const dc = Math.max(0,p.dailyCheckins|0);
+    const wp = p.weeklyPlanDone?5:0;
+    return {
+      total: c+m+bP+bH+bS+dc+wp,
+      breakdown: {connections:c,mrr:m,planBonus:bP,hqBonus:bH,sqlBonus:bS,checkins:dc,weekly:wp}
+    };
+  },
+  dailyPlanMrr(planMonth,factMonth,workingDaysLeft){
+    if(workingDaysLeft<=0) return 0;
+    const remaining=Math.max(planMonth-factMonth,0);
+    const base=planMonth/CFG.WORKING_DAYS_DEFAULT;
+    const adj=remaining/workingDaysLeft;
+    return Math.max(0,Math.min(Math.round(adj),Math.round(base*2)));
+  },
+  dailyPlanConnections(planMonth,factMonth,workingDaysLeft){
+    if(workingDaysLeft<=0) return 0;
+    const remaining=Math.max(planMonth-factMonth,0);
+    const base=Math.ceil(planMonth/CFG.WORKING_DAYS_DEFAULT);
+    const adj=Math.ceil(remaining/workingDaysLeft);
+    return Math.max(0,Math.min(adj,base*2));
+  },
+  level(points){
+    if(points>=1200) return 5;
+    if(points>=700)  return 4;
+    if(points>=350)  return 3;
+    if(points>=120)  return 2;
+    return 1;
+  },
+  levelInfo(points){
+    const lv=this.level(points);
+    const ranges=[0,120,350,700,1200,Infinity];
+    const next=ranges[lv];
+    const prev=ranges[lv-1];
+    const need=next===Infinity?0:Math.max(0,next-points);
+    const progress=next===Infinity?100:U.clamp((points-prev)/(next-prev)*100,0,100);
+    const titles={1:'Новичок',2:'Боец',3:'Профи',4:'Мастер',5:'Легенда'};
+    return {level:lv,title:titles[lv],need,nextAt:next===Infinity?null:next,progress};
+  },
+  forecast(planMonth,factMonth,workingDaysPassed,workingDaysTotal){
+    const daysLeft=Math.max(0,workingDaysTotal-workingDaysPassed);
+    const runRate = workingDaysPassed>0 ? factMonth/workingDaysPassed : 0;
+    const eom = factMonth + runRate*daysLeft;
+    const gap = planMonth - eom;
+    const requiredDaily = daysLeft>0 ? Math.max(0,(planMonth-factMonth)/daysLeft) : 0;
+    return { runRate, eom, gap, requiredDaily, daysLeft, daysPassed:workingDaysPassed };
+  },
+  slaStatus(leads){
+    if(!leads.length) return {contactPct:100,connectPct:100,contactOk:true,connectOk:true,overall:true,empty:true};
+    const total=leads.length;
+    const contactMet=leads.filter(l=>l.slaContactMet).length;
+    const contactPct=U.pct(contactMet,total);
+    const hq=leads.filter(l=>l.type==='HQ');
+    const connectMet=hq.filter(l=>l.slaConnectMet).length;
+    const connectPct=hq.length?U.pct(connectMet,hq.length):100;
+    return {
+      contactPct:Math.round(contactPct), connectPct:Math.round(connectPct),
+      contactOk:contactPct>=80, connectOk:connectPct>=80,
+      overall:contactPct>=80 && connectPct>=80, empty:false
+    };
+  },
+  leadTransferStatus({slaOk,crSqlTrial,allHqStagesOk,crSqlPaid,hasData}){
+    const trialOk=crSqlTrial>=40;
+    const paymentOk=allHqStagesOk && crSqlPaid>=30;
+    const criteria={sla:slaOk,trial:trialOk,payment:paymentOk};
+    const failedCount=Object.values(criteria).filter(x=>!x).length;
+    let status,label,description;
+    if(!hasData){ status='active'; label='🟢 Активно'; description='Лидов мало — критерии пока не оценены'; }
+    else if(failedCount===0){ status='active'; label='🟢 Активно'; description='Все критерии выполнены, лиды передаются'; }
+    else if(failedCount===1){ status='warning'; label='🟡 Предупреждение'; description='Один критерий под угрозой'; }
+    else { status='paused'; label='🔴 Приостановлено'; description='Передача лидов остановлена'; }
+    return {status,label,description,criteria,failedCount};
+  }
+};
+
+/* =========================================================
+   GOOGLE SHEETS
+   ========================================================= */
+const Sheets = {
+  async fetchRange(sheetId, tab){
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tab)}?key=${CFG.API_KEY}`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(`${tab}: HTTP ${r.status}`);
+    const j = await r.json();
+    return j.values || [];
+  },
+  async loadAll(){
+    const [factRows, peredRows, sqlRows] = await Promise.all([
+      this.fetchRange(CFG.SHEET_FACT, CFG.CURRENT_MONTH_TAB),
+      this.fetchRange(CFG.SHEET_LEADS, 'Передача'),
+      this.fetchRange(CFG.SHEET_LEADS, 'SQL'),
+    ]);
+    return { factRows, peredRows, sqlRows };
+  }
+};
+
+/* =========================================================
+   ПАРСИНГ
+   ========================================================= */
+const Parse = {
+  parseFactSheet(rows){
+    if(!rows||rows.length<2) return [];
+    const partners=[];
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i]||[];
+      const name=(r[0]||'').toString().trim();
+      if(!name) continue;
+      if(/^итого/i.test(name)) break;
+      if(/^week\s*-/i.test(name)) break;
+      if(name.startsWith('$')) continue;
+      partners.push({
+        rawName: name,
+        name: name.trim(),
+        normName: U.norm(name),
+        region: (r[1]||'').toString().trim(),
+        status: (r[2]||'').toString().trim(),
+        type: (r[3]||'').toString().trim() || 'Normal',
+        planMrr: U.parseUZS(r[4]),
+        planOkr: U.parseUZS(r[5]),
+        factMrr: U.parseUZS(r[6]),
+        connections: U.parseInt0(r[7]),       // H: Кол-во продаж
+        paymentsSum: U.parseUZS(r[8]),        // I: Сумма оплат
+        plannedPayment: U.parseUZS(r[9]),     // J: Планируемая оплата
+        trials: U.parseInt0(r[12]),           // M: Триал
+        remaining: U.parseUZS(r[13]),         // N: Остаток
+        avgCheck: U.parseUZS(r[15]),          // P: Средний чек
+        passedDays: U.parseInt0(r[22]),       // W: Прошло дней
+        workingDaysMonth: U.parseInt0(r[23]), // X: Рабочих дней в месяце
+      });
+    }
+    return partners;
+  },
+  parsePeredacha(rows){
+    if(!rows||rows.length<2) return [];
+    return rows.slice(1).map(r=>({
+      transferred: U.parseDate(r[0]),
+      connected:   U.parseDate(r[1]),
+      activated:   U.parseDate(r[2]),
+      leadId:      r[3]||'',
+      sales:       r[4]||'',
+      partner:     (r[5]||'').toString().trim(),
+      partnerNorm: U.norm(r[5]),
+      region:      r[6]||'',
+      status:      (r[7]||'').toString().trim(),
+      newMrr:      U.parseUZS(r[8]),
+      paidMrr:     U.parseUZS(r[9]),
+      pipeline:    r[10]||'',
+      type:'HQ'
+    })).filter(l=>l.partner);
+  },
+  parseSql(rows){
+    if(!rows||rows.length<2) return [];
+    return rows.slice(1).map(r=>({
+      transferred: U.parseDate(r[0]),
+      connected:   U.parseDate(r[1]),
+      activated:   U.parseDate(r[2]),
+      leadId:      r[3]||'',
+      sdr:         r[4]||'',
+      partner:     (r[5]||'').toString().trim(),
+      partnerNorm: U.norm(r[5]),
+      region:      r[6]||'',
+      status:      (r[7]||'').toString().trim(),
+      type:'SQL'
+    })).filter(l=>l.partner);
+  },
+  matchPartner(leadNorm, factPartners){
+    if(!leadNorm) return null;
+    let p = factPartners.find(x=>x.normName===leadNorm);
+    if(p) return p;
+    for(const fp of factPartners){
+      const aliases = PARTNER_ALIASES[fp.normName] || [];
+      if(aliases.some(a=>U.norm(a)===leadNorm)) return fp;
+    }
+    p = factPartners.find(x=>leadNorm.includes(x.normName) || x.normName.includes(leadNorm));
+    if(p) return p;
+    return null;
+  },
+};
+
+/* =========================================================
+   АГРЕГАЦИЯ
+   ========================================================= */
+function aggregatePartners(factPartners, hqLeads, sqlLeads){
+  const byId = new Map();
+  factPartners.forEach((p,idx)=>{
+    byId.set(p.normName, {
+      id: idx,
+      name: p.name, region: p.region, status: p.status, type: p.type,
+      planMrr: p.planMrr, planOkr: p.planOkr,
+      factMrr: p.factMrr, paymentsSum: p.paymentsSum, plannedPayment: p.plannedPayment,
+      connections: p.connections, trials: p.trials, avgCheck: p.avgCheck,
+      remaining: p.remaining,
+      passedDays: p.passedDays || U.todayWorkingDayIndex(),
+      workingDaysMonth: p.workingDaysMonth || U.workingDaysInMonth() || CFG.WORKING_DAYS_DEFAULT,
+      hq: { transferred:0, connected:0, activated:0, paid:0, lost:0, leads:[] },
+      sql: { transferred:0, trials:0, paid:0, leads:[] },
+      dailyCheckins: 0, weeklyPlanDone: false,
+    });
+  });
+
+  hqLeads.forEach(l=>{
+    const fp = Parse.matchPartner(l.partnerNorm, factPartners);
+    if(!fp) return;
+    const obj = byId.get(fp.normName);
+    obj.hq.leads.push(l);
+    obj.hq.transferred++;
+    if(HQ_CONNECTED_STATUSES.has(l.status) || l.connected) obj.hq.connected++;
+    if(HQ_ACTIVATED_STATUSES.has(l.status) || l.activated) obj.hq.activated++;
+    if(HQ_PAID_STATUSES.has(l.status))                     obj.hq.paid++;
+    if(HQ_LOST_STATUSES.has(l.status))                     obj.hq.lost++;
+    l.slaContactMet = l.connected && l.transferred ? ((l.connected-l.transferred)/(1000*3600))<=72 : true;
+    l.slaConnectMet = l.connected && l.transferred ? ((l.connected-l.transferred)/(1000*3600*24))<=3 : false;
+  });
+
+  sqlLeads.forEach(l=>{
+    const fp = Parse.matchPartner(l.partnerNorm, factPartners);
+    if(!fp) return;
+    const obj = byId.get(fp.normName);
+    obj.sql.leads.push(l);
+    obj.sql.transferred++;
+    if(SQL_TRIAL_STATUSES.has(l.status) || l.connected) obj.sql.trials++;
+    if(SQL_PAID_STATUSES.has(l.status) && l.activated) obj.sql.paid++;
+    l.slaContactMet = true;
+  });
+
+  const result = [];
+  for(const p of byId.values()){
+    const sc = Calc.totalPoints({
+      connections: p.connections,
+      factMrr: p.factMrr,
+      planMrr: p.planMrr,
+      hq: p.hq, sql: p.sql,
+      dailyCheckins: p.dailyCheckins,
+      weeklyPlanDone: p.weeklyPlanDone,
+    });
+    p.totalPoints = sc.total;
+    p.scoreBreakdown = sc.breakdown;
+    p.levelInfo = Calc.levelInfo(p.totalPoints);
+    p.forecast = Calc.forecast(p.planMrr, p.factMrr, p.passedDays, p.workingDaysMonth);
+    p.dailyPlanMrr = Calc.dailyPlanMrr(p.planMrr,p.factMrr,p.forecast.daysLeft);
+    p.dailyPlanConn = Calc.dailyPlanConnections(Math.max(p.connections+p.trials, 5), p.connections, p.forecast.daysLeft);
+    p.allLeads = [...p.hq.leads, ...p.sql.leads];
+    const sla = Calc.slaStatus(p.allLeads);
+    p.sla = sla;
+    const crSqlTrial = p.sql.transferred ? (p.sql.trials/p.sql.transferred)*100 : 100;
+    const crSqlPaid  = p.sql.transferred ? (p.sql.paid/p.sql.transferred)*100 : 100;
+    const hqStages = [
+      p.hq.transferred ? (p.hq.connected/p.hq.transferred)*100 : 100,
+      p.hq.connected   ? (p.hq.activated/p.hq.connected)*100   : 100,
+      p.hq.activated   ? (p.hq.paid/p.hq.activated)*100        : 100,
+    ];
+    const allHqStagesOk = hqStages.every(x=>x>=80) || p.hq.transferred===0;
+    p.transferStatus = Calc.leadTransferStatus({
+      slaOk: sla.overall, crSqlTrial, allHqStagesOk, crSqlPaid,
+      hasData: (p.hq.transferred + p.sql.transferred) > 0
+    });
+    p.crSqlTrial=crSqlTrial; p.crSqlPaid=crSqlPaid; p.hqStages=hqStages;
+    result.push(p);
+  }
+
+  result.sort((a,b)=>b.totalPoints-a.totalPoints);
+  result.forEach((p,i)=>p.rank=i+1);
+  return result;
+}
+
+/* =========================================================
+   VIEWS
+   ========================================================= */
+const Views = {
+  main(p, all){
+    if(!p) return Views.channelOverview(all);
+    const lvl=p.levelInfo;
+    const leader = all[0];
+    const gap = leader ? leader.totalPoints - p.totalPoints : 0;
+    const monthMrrPct = U.clamp(U.pct(p.factMrr,p.planMrr),0,150);
+    const targetConn = Math.max(p.connections+p.trials, 5);
+    const monthConnPct = U.clamp(U.pct(p.connections,targetConn),0,150);
+    const monthEnded = p.forecast.daysLeft<=0;
+    const planDoneSign = monthMrrPct>=100;
+
+    return `
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 panel p-5">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <div class="text-xs text-slate-400">Партнёр</div>
+            <div class="text-xl font-bold flex items-center gap-2 flex-wrap">
+              ${p.name} <span class="lvl-badge lvl-${lvl.level}">⭐ ${lvl.level} · ${lvl.title}</span>
+            </div>
+            <div class="text-xs text-slate-400 mt-1">${p.region||'—'} · ${p.type} · ${statusChip(p.status)}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-slate-400">Место в рейтинге</div>
+            <div class="text-2xl font-bold">#${p.rank} <span class="text-sm text-slate-400">из ${all.length}</span></div>
+            ${gap>0 ? `<div class="text-[11px] text-slate-400">До лидера: <b class="text-amber-300">${gap}</b> б.</div>`:`<div class="text-[11px] text-emerald-400">Ты лидер 👑</div>`}
+          </div>
+        </div>
+
+        <div class="mt-4 panel2 p-4">
+          <div class="text-xs text-slate-400 mb-2">📌 Цель на сегодня (осталось ${p.forecast.daysLeft} раб. дн.)</div>
+          ${monthEnded ? `<div class="text-sm text-slate-300">Месяц закрыт.</div>` :
+            planDoneSign ? `<div class="text-sm text-emerald-400">🎉 Месячный план выполнен (${Math.round(monthMrrPct)}%). Можешь добивать рекорд.</div>` :
+            `<div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <div class="text-[11px] text-slate-400">💰 MRR за день</div>
+                <div class="text-xl font-bold num">${U.fmtUZS(p.dailyPlanMrr)}</div>
+                <div class="text-[10px] text-slate-500">База: ${U.fmtUZSk(p.planMrr/CFG.WORKING_DAYS_DEFAULT)} / день</div>
+              </div>
+              <div>
+                <div class="text-[11px] text-slate-400">🔗 Подключения за день</div>
+                <div class="text-xl font-bold num">${p.dailyPlanConn}</div>
+                <div class="text-[10px] text-slate-500">Авторасчёт от остатка плана</div>
+              </div>
+            </div>`}
+        </div>
+
+        <div class="mt-4">
+          <div class="text-xs text-slate-400 mb-1">🎯 Цель месяца — MRR</div>
+          <div class="bar ${monthMrrPct<50?'crit':monthMrrPct<80?'warn':''}"><div style="width:${Math.min(monthMrrPct,100)}%"></div></div>
+          <div class="flex justify-between text-[11px] text-slate-400 mt-1 num">
+            <span>${U.fmtUZS(p.factMrr)} из ${U.fmtUZS(p.planMrr)}</span>
+            <span>${Math.round(monthMrrPct)}%</span>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="text-xs text-slate-400 mb-1">🔗 Цель месяца — Подключения</div>
+          <div class="bar blue"><div style="width:${Math.min(monthConnPct,100)}%"></div></div>
+          <div class="flex justify-between text-[11px] text-slate-400 mt-1 num">
+            <span>${p.connections} закрыто · ${p.trials} триалов</span>
+            <span>Ср.чек: ${U.fmtUZSk(p.avgCheck)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="panel p-5">
+          <div class="flex items-center justify-between">
+            <div class="text-xs text-slate-400">Баллы (всего за месяц)</div>
+            <div class="lvl-badge lvl-${lvl.level}">Ур. ${lvl.level}</div>
+          </div>
+          <div class="text-3xl font-bold mt-1 num">${p.totalPoints}</div>
+          ${lvl.nextAt ? `
+            <div class="bar mt-3"><div style="width:${lvl.progress}%"></div></div>
+            <div class="text-[11px] text-slate-400 mt-1">До уровня ${lvl.level+1}: ещё <b class="text-amber-300">${lvl.need}</b> баллов</div>`
+            : `<div class="text-[11px] text-emerald-400 mt-2">Максимальный уровень ✨</div>`}
+          <details class="mt-3 text-xs">
+            <summary class="text-slate-400 hover:text-slate-200">Из чего собрались баллы →</summary>
+            ${scoreBreakdownHtml(p)}
+          </details>
+        </div>
+
+        <div class="panel p-5">
+          <div class="text-xs text-slate-400 mb-1">🔄 Статус передачи лидов</div>
+          <div class="text-base font-semibold mb-1">${p.transferStatus.label}</div>
+          <div class="text-[11px] text-slate-400 mb-3">${p.transferStatus.description}</div>
+          <div class="space-y-1.5 text-xs">
+            <div>${p.transferStatus.criteria.sla?'✅':'⚠️'} SLA · контакт ${p.sla.contactPct}%, подключение ${p.sla.connectPct}%</div>
+            <div>${p.transferStatus.criteria.trial?'✅':'⚠️'} SQL→триал ${Math.round(p.crSqlTrial)}% (порог 40%)</div>
+            <div>${p.transferStatus.criteria.payment?'✅':'⚠️'} Оплата · HQ-этапы + SQL→оплата ${Math.round(p.crSqlPaid)}%</div>
+          </div>
+          <button class="btn mt-3 text-xs" onclick="App.go('leads')">Подробнее →</button>
+        </div>
+      </div>
+    </div>
+
+    ${Views.miniRating(p,all)}
+    `;
+  },
+
+  channelOverview(all){
+    const totalPlan=all.reduce((s,p)=>s+p.planMrr,0);
+    const totalFact=all.reduce((s,p)=>s+p.factMrr,0);
+    const totalConn=all.reduce((s,p)=>s+p.connections,0);
+    const wd=all[0]?.workingDaysMonth || CFG.WORKING_DAYS_DEFAULT;
+    const passed=all[0]?.passedDays || U.todayWorkingDayIndex();
+    const fc=Calc.forecast(totalPlan,totalFact,passed,wd);
+    return `
+      <div class="panel p-5 mb-4">
+        <div class="text-xs text-slate-400">Общий обзор канала</div>
+        <div class="text-xl font-bold mb-3">Май 2026 · ${all.length} партнёров</div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          ${kpi('План MRR',U.fmtUZSk(totalPlan))}
+          ${kpi('Факт MRR',U.fmtUZSk(totalFact),Math.round(U.pct(totalFact,totalPlan))+'%')}
+          ${kpi('Подключений',totalConn)}
+          ${kpi('Forecast EOM',U.fmtUZSk(fc.eom),fc.gap>0?`-${U.fmtUZSk(fc.gap)} ⚠️`:`+${U.fmtUZSk(-fc.gap)} ✅`)}
+        </div>
+      </div>
+      ${Views.top3(all)}
+    `;
+  },
+
+  miniRating(p,all){
+    const idx=all.findIndex(x=>x.id===p.id);
+    const slice=all.slice(Math.max(0,idx-2), Math.min(all.length,idx+3));
+    return `
+    <div class="panel p-5 mt-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-sm font-semibold">Мини-рейтинг</div>
+        <button class="btn text-xs" onclick="App.go('stats')">Полный рейтинг →</button>
+      </div>
+      <div class="space-y-1.5">
+        ${slice.map(x=>`
+          <div class="flex items-center gap-3 text-sm py-1.5 px-2 rounded ${x.id===p.id?'bg-slate-800':''}">
+            <div class="w-7 text-center text-slate-400 num">#${x.rank}</div>
+            <div class="flex-1 truncate">${x.name}</div>
+            <div class="lvl-badge lvl-${x.levelInfo.level}">L${x.levelInfo.level}</div>
+            <div class="num font-semibold w-14 text-right">${x.totalPoints}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  },
+
+  stats(all, filter){
+    const list = filterPartners(all, filter);
+    return `
+    ${Views.top3(all)}
+    <div class="panel p-4 mt-4">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <input id="fName" placeholder="🔍 поиск" value="${filter.name||''}" class="flex-1 min-w-[140px]"/>
+        <select id="fRegion">
+          <option value="">Все регионы</option>
+          ${[...new Set(all.map(p=>p.region))].filter(Boolean).map(r=>`<option ${filter.region===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+        <select id="fType">
+          <option value="">Все типы</option>
+          <option ${filter.type==='Normal'?'selected':''}>Normal</option>
+          <option ${filter.type==='Franchise'?'selected':''}>Franchise</option>
+        </select>
+        <select id="fSort">
+          <option value="points" ${filter.sort==='points'?'selected':''}>По баллам</option>
+          <option value="pct"    ${filter.sort==='pct'?'selected':''}>По % выполнения</option>
+          <option value="mrr"    ${filter.sort==='mrr'?'selected':''}>По факту MRR</option>
+        </select>
+      </div>
+      <div class="grid-cards">
+        ${list.map(p=>partnerCard(p)).join('')}
+      </div>
+    </div>`;
+  },
+
+  top3(all){
+    const t = all.filter(p=>p.status!=='Inactive').slice(0,3);
+    if(t.length<1) return '';
+    return `
+    <div class="grid md:grid-cols-3 gap-3">
+      ${t.map((p,i)=>{
+        const cls = i===0?'top1':i===1?'top2':'top3';
+        const medal = ['🥇','🥈','🥉'][i];
+        return `
+        <div class="panel p-4 ${cls}">
+          <div class="flex items-center justify-between">
+            <div class="text-2xl">${medal}</div>
+            <div class="lvl-badge lvl-${p.levelInfo.level}" style="background:rgba(255,255,255,.25);color:inherit">L${p.levelInfo.level}</div>
+          </div>
+          <div class="font-bold text-base mt-2">${p.name}</div>
+          <div class="text-xs opacity-80">${p.region||'—'}</div>
+          <div class="grid grid-cols-3 gap-1 mt-3 text-center text-[11px]">
+            <div><div class="font-bold text-base num">${p.totalPoints}</div><div class="opacity-75">баллов</div></div>
+            <div><div class="font-bold text-base num">${Math.round(U.pct(p.factMrr,p.planMrr))}%</div><div class="opacity-75">плана</div></div>
+            <div><div class="font-bold text-base num">${p.connections}</div><div class="opacity-75">подкл.</div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  },
+
+  leads(p, all){
+    const f = App.state.leadsFilter;
+    const selectedId = p ? p.id : null;
+    const totalLeads = all.reduce((s,x)=>s+x.hq.transferred+x.sql.transferred, 0);
+
+    // приоритет для каждого партнёра
+    const withPrio = all.map(x=>{ x._prio = getLeadsPriority(x); return x; });
+
+    // фильтрация по name / region
+    let list = [...withPrio];
+    if(f.name) list = list.filter(x=>x.name.toLowerCase().includes(f.name.toLowerCase()));
+    if(f.region) list = list.filter(x=>(x.region||'').trim()===f.region);
+
+    // разделение по зонам (filtered)
+    const prio1    = list.filter(x=>x._prio.zone==='prio1').sort((a,b)=>b.totalPoints-a.totalPoints);
+    const prio2    = list.filter(x=>x._prio.zone==='prio2').sort((a,b)=>b.totalPoints-a.totalPoints);
+    const prio3    = list.filter(x=>x._prio.zone==='prio3').sort((a,b)=>b.totalPoints-a.totalPoints);
+    const noSales  = list.filter(x=>x._prio.zone==='no-sales').sort((a,b)=>b.totalPoints-a.totalPoints);
+    const inactive = list.filter(x=>x._prio.zone==='inactive').sort((a,b)=>b.totalPoints-a.totalPoints);
+
+    // KPI всегда по full all (без фильтров)
+    const allPrio1    = withPrio.filter(x=>x._prio.zone==='prio1');
+    const allPrio2    = withPrio.filter(x=>x._prio.zone==='prio2');
+    const allPrio3    = withPrio.filter(x=>x._prio.zone==='prio3');
+    const allNoSales  = withPrio.filter(x=>x._prio.zone==='no-sales');
+    const allInactive = withPrio.filter(x=>x._prio.zone==='inactive');
+
+    const regions = [...new Set(all.map(x=>(x.region||'').trim()).filter(Boolean))];
+
+    const zones = [
+      {key:'prio1',    emoji:'🟢', title:'Приоритет 1 · Полная передача',      partners:prio1,    collapsed:false, cls:''},
+      {key:'prio2',    emoji:'🟡', title:'Приоритет 2 · Ограниченная передача', partners:prio2,    collapsed:false, cls:''},
+      {key:'prio3',    emoji:'🟠', title:'Приоритет 3 · Минимальная передача',  partners:prio3,    collapsed:false, cls:''},
+      {key:'no-sales', emoji:'🔴', title:'Нет продаж · Лиды не передаются',    partners:noSales,  collapsed:false, cls:'zone-no-sales'},
+      {key:'inactive', emoji:'⚫', title:'Неактивные',                          partners:inactive, collapsed:true,  cls:''},
+    ];
+    const showZones = f.zone==='all' ? zones : zones.filter(z=>z.key===f.zone);
+
+    return `
+    <!-- KPI -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+      ${kpi('Лидов передано', totalLeads, 'за текущий период')}
+      ${kpi('🟢 Приоритет 1', allPrio1.length, 'полная передача')}
+      ${kpi('🟡 Приоритет 2', allPrio2.length, 'ограниченная')}
+      ${kpi('🟠/🔴 Приоритет 3+', allPrio3.length + allNoSales.length, 'низкая / нет продаж')}
+      ${kpi('⚫ Неактивны', allInactive.length, '')}
+    </div>
+
+    <!-- Фильтры -->
+    <div id="leadsFilterBox" class="panel p-3 mb-4 flex flex-wrap items-center gap-2">
+      <div class="leads-fchip ${f.zone==='all'?'active':''}" data-zone="all">Все</div>
+      <div class="leads-fchip ${f.zone==='prio1'?'active':''}" data-zone="prio1">🟢 Приоритет 1</div>
+      <div class="leads-fchip ${f.zone==='prio2'?'active':''}" data-zone="prio2">🟡 Приоритет 2</div>
+      <div class="leads-fchip ${f.zone==='prio3'?'active':''}" data-zone="prio3">🟠 Приоритет 3</div>
+      <div class="leads-fchip ${f.zone==='no-sales'?'active':''}" data-zone="no-sales">🔴 Нет продаж</div>
+      <div class="leads-fchip ${f.zone==='inactive'?'active':''}" data-zone="inactive">⚫ Неактивны</div>
+      <div class="ml-auto flex items-center gap-2 flex-wrap">
+        <input id="lfName" placeholder="🔍 поиск" value="${f.name||''}" class="min-w-[130px]"/>
+        <select id="lfRegion">
+          <option value="">Все регионы</option>
+          ${regions.map(r=>`<option ${f.region===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <!-- Зоны -->
+    ${showZones.map(z=> z.collapsed
+      ? `<details class="mb-2 ${z.cls}"><summary class="zone-header">${z.emoji} ${z.title} (${z.partners.length})</summary>
+           ${z.partners.length ? `<div class="grid-cards mt-2">${z.partners.map(x=>leadsPartnerCard(x,selectedId)).join('')}</div>` : `<div class="text-sm text-slate-400 py-2">Нет партнёров в этой зоне</div>`}
+         </details>`
+      : `<div class="${z.cls}"><div class="zone-header">${z.emoji} ${z.title} (${z.partners.length})</div>
+         ${z.partners.length ? `<div class="grid-cards mb-4">${z.partners.map(x=>leadsPartnerCard(x,selectedId)).join('')}</div>` : `<div class="text-sm text-slate-400 py-2 mb-4">Нет партнёров в этой зоне</div>`}</div>`
+    ).join('')}
+    `;
+  },
+
+  /* funnelHtml оставлен для обратной совместимости, но не вызывается из leads */
+  funnelHtml(stages){
+    const max=Math.max(...stages.map(s=>s.value),1);
+    return `<div class="space-y-1.5">${stages.map((s,i)=>{
+      const next=stages[i+1];
+      const cr=next?Math.round(U.pct(next.value,s.value||1)):null;
+      return `<div class="funnel-step flex items-center gap-2">
+        <div class="flex-1">
+          <div class="flex items-center justify-between text-sm"><span>${s.label}</span><span class="num font-semibold">${s.value}</span></div>
+          <div class="bar mt-1 ${i===0?'blue':''}"><div style="width:${(s.value/max)*100}%"></div></div>
+        </div>
+        ${cr!=null?`<div class="text-[11px] text-slate-400 w-12 text-right">→ ${cr}%</div>`:''}
+      </div>`;
+    }).join('')}</div>`;
+  },
+
+  forecast(p, all){
+    const blocks = p ? [{title:p.name, p}] : [{title:'Канал суммарно', p: aggregateChannel(all)}];
+    return blocks.map(({title,p})=>Views.forecastBlock(title,p)).join('');
+  },
+  forecastBlock(title,p){
+    const fc=p.forecast;
+    const pct=Math.round(U.pct(p.factMrr,p.planMrr));
+    const status= fc.gap>0 ? 'crit' : 'g';
+    const optimistic = p.factMrr + fc.runRate*1.15*fc.daysLeft;
+    return `
+    <div class="panel p-5 mb-4">
+      <div class="text-xs text-slate-400">${title}</div>
+      <div class="text-base font-semibold mb-3">📊 План / Факт / Прогноз до конца месяца</div>
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+        ${kpi('План месяца',U.fmtUZS(p.planMrr))}
+        ${kpi('Факт',U.fmtUZS(p.factMrr),pct+'%')}
+        ${kpi('Дней прошло / осталось', `${fc.daysPassed} / ${fc.daysLeft}`)}
+        ${kpi('Run Rate',U.fmtUZSk(fc.runRate)+' / день')}
+      </div>
+      <div class="grid md:grid-cols-3 gap-3 mt-3">
+        ${kpi('📊 Forecast EOM (реалист)',U.fmtUZS(fc.eom))}
+        ${kpi('📈 Оптимистичный прогноз',U.fmtUZS(optimistic))}
+        ${kpi(fc.gap>0?'⚠️ Gap to Plan':'✅ Опережение', U.fmtUZS(Math.abs(fc.gap)))}
+      </div>
+      <div class="grid md:grid-cols-2 gap-3 mt-3">
+        ${kpi('Required Daily Run Rate',U.fmtUZS(fc.requiredDaily)+' / день','для дотягивания плана')}
+        ${kpi('Дневной авторасчёт',U.fmtUZS(p.dailyPlanMrr||0),'учитывая отставание')}
+      </div>
+      <div class="mt-4">
+        <div class="bar ${status==='crit'?'crit':''}"><div style="width:${Math.min(pct,100)}%"></div></div>
+        <div class="text-[11px] text-slate-400 mt-1 num">${U.fmtUZS(p.factMrr)} из ${U.fmtUZS(p.planMrr)} · ${pct}%</div>
+      </div>
+    </div>
+    `;
+  },
+
+  scoring(p, all){
+    if(!p) return `
+      <div class="panel p-5">
+        <div class="text-sm text-slate-400">Выбери партнёра в шапке для детальной разбивки баллов.</div>
+        <div class="grid-cards mt-4">
+          ${all.map(x=>`
+            <div class="panel2 p-3 cursor-pointer hover:border-slate-600" onclick="App.selectPartner(${x.id})">
+              <div class="flex items-center justify-between"><div class="text-sm font-semibold truncate">${x.name}</div><div class="lvl-badge lvl-${x.levelInfo.level}">L${x.levelInfo.level}</div></div>
+              <div class="text-2xl font-bold num mt-1">${x.totalPoints}</div>
+              <div class="text-[11px] text-slate-400">баллов · #${x.rank}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    const lvl=p.levelInfo;
+    return `
+    <div class="panel p-5">
+      <div class="flex items-start justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-xs text-slate-400">Партнёр</div>
+          <div class="text-xl font-bold">${p.name}</div>
+        </div>
+        <div class="text-right">
+          <div class="lvl-badge lvl-${lvl.level} mb-1">⭐ Уровень ${lvl.level} · ${lvl.title}</div>
+          <div class="text-3xl font-bold num">${p.totalPoints}</div>
+          <div class="text-[11px] text-slate-400">баллов всего</div>
+        </div>
+      </div>
+      ${lvl.nextAt ? `
+        <div class="bar mt-4"><div style="width:${lvl.progress}%"></div></div>
+        <div class="text-[11px] text-slate-400 mt-1">До уровня ${lvl.level+1}: ещё <b class="text-amber-300">${lvl.need}</b> баллов (порог ${lvl.nextAt})</div>`
+        : `<div class="text-[11px] text-emerald-400 mt-2">Максимальный уровень ✨</div>`}
+
+      <div class="mt-5">
+        <div class="text-sm font-semibold mb-2">Из чего собрались баллы:</div>
+        ${scoreBreakdownHtml(p)}
+      </div>
+
+      <details class="mt-4 text-xs panel2 p-3">
+        <summary class="text-slate-300 font-semibold">📐 Формула</summary>
+        <div class="text-slate-400 mt-2 leading-relaxed">
+          <b>Подключения</b>: каждое = +50 (за триал/тест клиента).<br>
+          <b>MRR</b>: round(Факт MRR ÷ 380 000 × 50).<br>
+          <b>Бонус % плана</b>: ≥120%→+60, ≥100%→+40, ≥75%→+20, ≥50%→+10.<br>
+          <b>HQ-конверсия</b>: каждый из 3 этапов воронки (передан→подключён→активирован→оплачен): ≥80%→+15, 60–79%→+5.<br>
+          <b>SQL-конверсия</b>: SQL→триал ≥60%→+20 / 40–59%→+10. SQL→оплата ≥40%→+20 / 20–39%→+10.<br>
+          <b>Дисциплина</b>: daily check-in +1/день, weekly plan выполнен +5/неделя.
+        </div>
+      </details>
+    </div>`;
+  },
+
+  daily(all){
+    const local = JSON.parse(localStorage.getItem('billz.daily')||'{}');
+    const today = new Date().toISOString().slice(0,10);
+    const todayData = local[today] || {};
+    return `
+    <div class="panel p-5">
+      <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div>
+          <div class="text-base font-semibold">Daily ввод (${today})</div>
+          <div class="text-xs text-slate-400">5 колонок — то, чего нет в Sheets. Остальное (MRR, оплаты, лиды) тянется автоматически.</div>
+        </div>
+        <button class="btn btn-pri" onclick="App.saveDaily()">💾 Сохранить локально</button>
+      </div>
+      <div class="scroll-x">
+        <table class="w-full text-xs">
+          <thead><tr class="text-slate-400 text-left">
+            <th class="py-2 pr-2">Партнёр</th>
+            <th class="py-2 px-2 text-center">Daily ✓</th>
+            <th class="py-2 px-2 text-center">Встречи</th>
+            <th class="py-2 px-2 text-left">Фокус дня</th>
+            <th class="py-2 px-2 text-left">Комментарий</th>
+            <th class="py-2 px-2 text-right text-slate-500" colspan="3">📊 Из Sheets</th>
+          </tr></thead>
+          <tbody>
+            ${all.map(p=>{
+              const d=todayData[p.id]||{};
+              return `<tr class="border-t border-slate-800">
+                <td class="py-1.5 pr-2 font-medium">${p.name} <span class="text-[10px] text-slate-500">${p.region||''}</span></td>
+                <td class="text-center"><input type="checkbox" data-pid="${p.id}" data-f="checkin" ${d.checkin?'checked':''} class="d-input"/></td>
+                <td><input type="number" min=0 max=20 data-pid="${p.id}" data-f="meetings" value="${d.meetings||''}" class="d-input w-16" placeholder="0"/></td>
+                <td><input data-pid="${p.id}" data-f="focus" value="${d.focus||''}" class="d-input w-full" placeholder="Встреча с X в 15:00"/></td>
+                <td><input data-pid="${p.id}" data-f="comment" value="${d.comment||''}" class="d-input w-full" placeholder=""/></td>
+                <td class="text-right text-slate-400 num">${U.fmtUZSk(p.factMrr)}</td>
+                <td class="text-right text-slate-400 num">${p.connections} подкл</td>
+                <td class="text-right text-slate-500 num">план дня: ${U.fmtUZSk(p.dailyPlanMrr||0)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="text-[11px] text-slate-500 mt-3">⚠️ Сохранение пока локальное (browser). Запись обратно в Google Sheets — через Apps Script на следующем этапе.</div>
+    </div>`;
+  },
+
+  exec(all){
+    const active = all.filter(p=>p.status==='Active');
+    const withSales = all.filter(p=>p.connections>0);
+    const noSales = active.filter(p=>p.connections===0);
+    const totalPlan=all.reduce((s,p)=>s+p.planMrr,0);
+    const totalFact=all.reduce((s,p)=>s+p.factMrr,0);
+    const totalPaid=all.reduce((s,p)=>s+p.paymentsSum,0);
+    const totalPlanned=all.reduce((s,p)=>s+p.plannedPayment,0);
+    const totalConn=all.reduce((s,p)=>s+p.connections,0);
+    const avgCheck=totalConn>0?totalPaid/totalConn:0;
+    const totalHQ=all.reduce((s,p)=>s+p.hq.transferred,0);
+    const totalSQL=all.reduce((s,p)=>s+p.sql.transferred,0);
+    const totalPaidLeads=all.reduce((s,p)=>s+p.hq.paid+p.sql.paid,0);
+    const wd=all[0]?.workingDaysMonth||CFG.WORKING_DAYS_DEFAULT;
+    const passed=all[0]?.passedDays||U.todayWorkingDayIndex();
+    const fc=Calc.forecast(totalPlan,totalFact,passed,wd);
+    const top5=all.slice(0,5);
+    const bottom5=all.filter(p=>p.status==='Active').slice(-5).reverse();
+    const lvlDist=[1,2,3,4,5].map(L=>({L,count:all.filter(p=>p.levelInfo.level===L).length}));
+    const trDist={
+      active: all.filter(p=>p.transferStatus.status==='active').length,
+      warn:   all.filter(p=>p.transferStatus.status==='warning').length,
+      paused: all.filter(p=>p.transferStatus.status==='paused').length,
+    };
+
+    return `
+    <div class="panel p-5 mb-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div class="text-xs text-slate-400">🔒 Executive Summary · закрытая сводка</div>
+          <div class="text-xl font-bold">Канал партнёров · Май 2026</div>
+        </div>
+        <button class="btn" onclick="sessionStorage.removeItem('billz.exec');App.go('main')">Выйти</button>
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      ${kpi('Партнёров',all.length, `${active.length} active`)}
+      ${kpi('С продажами',withSales.length, `${noSales.length} без продаж`)}
+      ${kpi('Общий план',U.fmtUZS(totalPlan))}
+      ${kpi('Общий факт',U.fmtUZS(totalFact),Math.round(U.pct(totalFact,totalPlan))+'%')}
+      ${kpi('Сумма оплат',U.fmtUZS(totalPaid))}
+      ${kpi('Планируемая оплата',U.fmtUZS(totalPlanned))}
+      ${kpi('Подключений',totalConn,'Ср.чек: '+U.fmtUZSk(avgCheck))}
+      ${kpi('Revenue/Partner', U.fmtUZSk(active.length?totalFact/active.length:0))}
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-2">📊 Прогноз по каналу</div>
+        ${kpi('Forecast EOM',U.fmtUZS(fc.eom))}
+        <div class="mt-3">${kpi(fc.gap>0?'⚠️ Gap':'✅ Опережение',U.fmtUZS(Math.abs(fc.gap)))}</div>
+        <div class="mt-3">${kpi('Required daily',U.fmtUZS(fc.requiredDaily)+' /день')}</div>
+      </div>
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-2">🔄 Лиды по каналу</div>
+        ${kpi('Передано HQ',totalHQ)}
+        <div class="mt-2">${kpi('Передано SQL',totalSQL)}</div>
+        <div class="mt-2">${kpi('Лид→продажа', Math.round(U.pct(totalPaidLeads,totalHQ+totalSQL))+'%')}</div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4 mb-4">
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-3">🏆 Топ-5</div>
+        <div class="space-y-1 text-sm">
+          ${top5.map(p=>`<div class="flex items-center gap-2"><div class="w-6 num text-slate-400">#${p.rank}</div><div class="flex-1 truncate">${p.name}</div><div class="num font-semibold">${p.totalPoints}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-3">⚠️ Антитоп-5 (active)</div>
+        <div class="space-y-1 text-sm">
+          ${bottom5.map(p=>`<div class="flex items-center gap-2"><div class="w-6 num text-slate-400">#${p.rank}</div><div class="flex-1 truncate">${p.name}</div><div class="num">${p.totalPoints}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-3">📊 Распределение по уровням</div>
+        ${lvlDist.map(x=>`
+          <div class="flex items-center gap-2 mb-1.5 text-sm">
+            <div class="lvl-badge lvl-${x.L}">L${x.L}</div>
+            <div class="bar flex-1"><div style="width:${x.count/all.length*100}%"></div></div>
+            <div class="num w-8 text-right">${x.count}</div>
+          </div>`).join('')}
+      </div>
+      <div class="panel p-5">
+        <div class="text-base font-semibold mb-3">🚦 Статус передачи</div>
+        <div class="text-sm space-y-2">
+          <div class="flex items-center gap-2"><span class="dot" style="background:#22c55e"></span> 🟢 Активно — ${trDist.active}</div>
+          <div class="flex items-center gap-2"><span class="dot" style="background:#eab308"></span> 🟡 Предупреждение — ${trDist.warn}</div>
+          <div class="flex items-center gap-2"><span class="dot" style="background:#ef4444"></span> 🔴 Приостановлено — ${trDist.paused}</div>
+        </div>
+      </div>
+    </div>
+    `;
+  },
+};
+
+/* helpers */
+function kpi(label,value,sub){
+  return `<div class="panel2 p-3">
+    <div class="text-[11px] text-slate-400">${label}</div>
+    <div class="text-lg font-bold num">${value}</div>
+    ${sub?`<div class="text-[10px] text-slate-500">${sub}</div>`:''}
+  </div>`;
+}
+function statusChip(s){
+  if(s==='Active') return `<span class="chip chip-g">Active</span>`;
+  if(s==='Inactive') return `<span class="chip chip-r">Inactive</span>`;
+  return `<span class="chip">${s||'—'}</span>`;
+}
+function critCard(title,ok,lines){
+  return `<div class="panel2 p-3">
+    <div class="text-xs ${ok?'text-emerald-400':'text-amber-300'} font-semibold mb-1">${ok?'✅':'⚠️'} ${title}</div>
+    ${lines.map(l=>`<div class="text-[11px] text-slate-300">${l}</div>`).join('')}
+  </div>`;
+}
+function partnerCard(p){
+  const pct=Math.round(U.pct(p.factMrr,p.planMrr));
+  const tr = p.transferStatus.status;
+  const trColor = tr==='active'?'chip-g':tr==='warning'?'chip-y':'chip-r';
+  return `<div class="panel2 p-4 cursor-pointer hover:border-slate-600" onclick="App.selectPartner(${p.id})">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold truncate">${p.name}</div>
+        <div class="text-[10px] text-slate-400">${p.region||'—'} · ${p.type}</div>
+      </div>
+      <div class="text-right">
+        <div class="lvl-badge lvl-${p.levelInfo.level}">L${p.levelInfo.level}</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">#${p.rank}</div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+      <div><div class="text-slate-400">План</div><div class="num font-semibold">${U.fmtUZSk(p.planMrr)}</div></div>
+      <div><div class="text-slate-400">Факт</div><div class="num font-semibold">${U.fmtUZSk(p.factMrr)}</div></div>
+      <div><div class="text-slate-400">Подкл.</div><div class="num font-semibold">${p.connections} <span class="text-slate-500">/ ${p.trials} тр.</span></div></div>
+      <div><div class="text-slate-400">Лиды HQ/SQL</div><div class="num font-semibold">${p.hq.transferred}/${p.sql.transferred}</div></div>
+    </div>
+    <div class="mt-3">
+      <div class="bar ${pct<50?'crit':pct<80?'warn':''}"><div style="width:${Math.min(pct,100)}%"></div></div>
+      <div class="flex justify-between text-[10px] text-slate-400 mt-0.5"><span>${pct}%</span><span>${p.totalPoints} б.</span></div>
+    </div>
+    <div class="mt-2 flex items-center gap-1 flex-wrap">
+      ${/^(саидакбар|nexpos)$/i.test(p.name)?'':`<span class="chip ${trColor}" style="font-size:.6rem" title="Передача лидов: ${p.transferStatus.description}">${tr==='active'?'Передача лидов ✅':tr==='warning'?'Передача лидов ⚠️':'Передача лидов ⛔'}</span>`}
+      ${statusChip(p.status)}
+    </div>
+  </div>`;
+}
+/* ───── Leads tab helpers ───── */
+function leadsPartnerTips(p){
+  const tips=[];
+  const totalL=p.hq.transferred+p.sql.transferred;
+  const totalPaid=p.hq.paid+p.sql.paid;
+  const conversion=totalL>0?(totalPaid/totalL)*100:0;
+
+  // Lead conversion tips (new priority system)
+  if(totalL>=3 && conversion<20){
+    tips.push(`Конверсия лидов критически низкая: ${Math.round(conversion)}% → нужно минимум 20%`);
+  } else if(totalL>=3 && conversion<40){
+    tips.push(`Конверсия лидов ниже нормы: ${Math.round(conversion)}% → нужно 40%`);
+  }
+
+  // Low points tip
+  if(p.levelInfo.level===1 && p.totalPoints<50){
+    tips.push(`Мало баллов (${p.totalPoints}) — наберите минимум 50 для повышения приоритета`);
+  }
+
+  // SLA tips
+  if(!p.transferStatus.criteria.sla){
+    if(!p.sla.contactOk) tips.push(`SLA контакта: ${p.sla.contactPct}% → нужно 80%`);
+    if(!p.sla.connectOk) tips.push(`SLA подключения: ${p.sla.connectPct}% → нужно 80%`);
+  }
+  if(!p.transferStatus.criteria.trial && p.sql.transferred){
+    const need=Math.max(1,Math.ceil(0.40*p.sql.transferred - p.sql.trials));
+    tips.push(`SQL→триал: ${Math.round(p.crSqlTrial)}% → нужно 40% (ещё ${need})`);
+  }
+  if(!p.transferStatus.criteria.payment){
+    if(Math.round(p.crSqlPaid)<30 && p.sql.transferred) tips.push(`SQL→оплата: ${Math.round(p.crSqlPaid)}% → нужно 30%`);
+    const weakStage = p.hqStages.findIndex(x=>Math.round(x)<80);
+    if(weakStage>=0 && p.hq.transferred){
+      const names=['передан→подключён','подключён→активирован','активирован→оплачен'];
+      tips.push(`HQ ${names[weakStage]}: ${Math.round(p.hqStages[weakStage])}% → нужно 80%`);
+    }
+  }
+  return tips;
+}
+
+function leadsListHtml(leads){
+  if(!leads.length) return `<div class="text-[11px] text-slate-400 py-1">Лиды не передавались</div>`;
+  const MAX_SHOW = 20;
+  const visible = leads.slice(0, MAX_SHOW);
+  const rest = leads.length - MAX_SHOW;
+  const fmtDate = d => d ? d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}) : '—';
+  return `<div class="mt-2 space-y-1 text-[11px]">
+    ${visible.map(l=>{
+      const id = l.leadId ? (l.leadId.length>30 ? '…'+l.leadId.slice(-12) : l.leadId) : 'Без ID';
+      const typeChip = l.type==='HQ' ? '<span class="chip chip-b" style="font-size:.65rem;padding:.1rem .4rem">HQ</span>' : '<span class="chip chip-b" style="font-size:.65rem;padding:.1rem .4rem">SQL</span>';
+      const stColor = l.status && (l.status==='Сделка успешна'||l.status==='Актив') ? 'text-emerald-400' : l.status==='Не подходит'||l.status==='Отказ' ? 'text-red-400' : 'text-slate-300';
+      return `<div class="flex items-center gap-2 flex-wrap">
+        <span class="truncate max-w-[120px] text-slate-400" title="${l.leadId||''}">${id}</span>
+        ${typeChip}
+        <span class="${stColor} truncate max-w-[140px]">${l.status||'—'}</span>
+        <span class="text-slate-500 ml-auto num">${fmtDate(l.transferred)}</span>
+      </div>`;
+    }).join('')}
+    ${rest>0 ? `<div class="text-slate-500">… ещё ${rest}</div>` : ''}
+  </div>`;
+}
+
+function getLeadsPriority(p){
+  if(p.status!=='Active'){
+    return {zone:'inactive',label:'⚫ Неактивен',chipClass:'',description:'Партнёр неактивен',recommendation:''};
+  }
+  if(p.connections===0){
+    return {zone:'no-sales',label:'🔴 Нет продаж',chipClass:'chip-r',description:'Нет собственных продаж — лиды не передаются',recommendation:'Сделайте хотя бы 1 продажу, чтобы начать получать лиды'};
+  }
+  var totalLeads=p.hq.transferred+p.sql.transferred;
+  var totalPaid=p.hq.paid+p.sql.paid;
+  var conversion=totalLeads>0?(totalPaid/totalLeads)*100:0;
+  var hasEnoughData=totalLeads>=3;
+  var failedCount=p.transferStatus.failedCount;
+  if((hasEnoughData&&conversion<20)||failedCount>=2||(p.levelInfo.level===1&&p.totalPoints<50)){
+    return {zone:'prio3',label:'🟠 Приоритет 3',chipClass:'chip-y',description:'Минимальная передача лидов',recommendation:''};
+  }
+  if(failedCount>=1||(hasEnoughData&&conversion<40)||!hasEnoughData){
+    var reason=!hasEnoughData?'Мало данных для оценки (получено лидов: '+totalLeads+' из 3 необходимых)':'';
+    return {zone:'prio2',label:'🟡 Приоритет 2',chipClass:'chip-y',description:'Ограниченная передача лидов',recommendation:reason};
+  }
+  return {zone:'prio1',label:'🟢 Приоритет 1',chipClass:'chip-g',description:'Полная передача лидов',recommendation:''};
+}
+
+function leadsPartnerCard(p, selectedId){
+  const prio = p._prio || getLeadsPriority(p);
+  const totalL = p.hq.transferred + p.sql.transferred;
+  const totalPaid = p.hq.paid + p.sql.paid;
+  const conversion = totalL > 0 ? Math.round((totalPaid/totalL)*100) : null;
+  const isSelected = selectedId!=null && p.id===selectedId;
+  const tips = leadsPartnerTips(p);
+  const hasLeadData = totalL > 0;
+
+  // SLA display helpers
+  const slaCpct = hasLeadData ? p.sla.contactPct+'%' : '—';
+  const slaKpct = hasLeadData ? p.sla.connectPct+'%' : '—';
+  const sqlTrialPct = p.sql.transferred > 0 ? Math.round(p.crSqlTrial)+'%' : '—';
+
+  // No-sales zone: special compact card
+  if(prio.zone==='no-sales'){
+    return `<div class="panel2 p-4 ${isSelected?'leads-card-sel':''}" style="opacity:.85">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${p.name}</div>
+          <div class="text-[10px] text-slate-400">${(p.region||'').trim()||'—'} · ${p.type}</div>
+        </div>
+        <div class="text-right flex flex-col items-end gap-1">
+          <div class="lvl-badge lvl-${p.levelInfo.level}">L${p.levelInfo.level}</div>
+          <span class="chip chip-r" style="font-size:.65rem">${prio.label}</span>
+        </div>
+      </div>
+      <div class="mt-2 text-[11px] text-red-300">${prio.description}</div>
+      ${prio.recommendation ? `<div class="mt-1 text-[10px] text-amber-300">💡 ${prio.recommendation}</div>` : ''}
+    </div>`;
+  }
+
+  // Inactive zone: minimal card
+  if(prio.zone==='inactive'){
+    return `<div class="panel2 p-4 ${isSelected?'leads-card-sel':''}" style="opacity:.5">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold truncate">${p.name}</div>
+          <div class="text-[10px] text-slate-400">${(p.region||'').trim()||'—'} · ${p.type}</div>
+        </div>
+        <span class="chip" style="font-size:.65rem;background:#444;color:#999">${prio.label}</span>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="panel2 p-4 ${isSelected?'leads-card-sel':''}">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold truncate">${p.name}</div>
+        <div class="text-[10px] text-slate-400">${(p.region||'').trim()||'—'} · ${p.type}</div>
+      </div>
+      <div class="text-right flex flex-col items-end gap-1">
+        <div class="lvl-badge lvl-${p.levelInfo.level}">L${p.levelInfo.level}</div>
+        <span class="chip ${prio.chipClass}" style="font-size:.65rem">${prio.label}</span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+      <div><div class="text-slate-400">Лидов</div><div class="num font-semibold">${totalL} <span class="text-slate-500 font-normal">(HQ:${p.hq.transferred} SQL:${p.sql.transferred})</span></div></div>
+      <div><div class="text-slate-400">Подключено</div><div class="num font-semibold">${p.hq.connected + p.sql.trials}</div></div>
+      <div><div class="text-slate-400">Оплатили</div><div class="num font-semibold">${totalPaid}</div></div>
+    </div>
+
+    <div class="mt-2 text-[11px]">
+      <span class="text-slate-400">Конверсия:</span> <span class="num font-semibold">${conversion!=null ? conversion+'%' : '—'}</span>
+    </div>
+
+    <div class="mt-2 space-y-0.5 text-[11px]">
+      <div class="flex justify-between"><span class="text-slate-400">SLA контакт</span><span>${p.sla.contactOk||!hasLeadData?'✅':'⚠️'} ${slaCpct}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">SLA подключение</span><span>${p.sla.connectOk||!hasLeadData?'✅':'⚠️'} ${slaKpct}</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">SQL→триал</span><span>${p.transferStatus.criteria.trial?'✅':'⚠️'} ${sqlTrialPct}</span></div>
+    </div>
+
+    ${!hasLeadData ? `<div class="text-[10px] text-slate-500 mt-2">Лиды пока не передавались</div>` : ''}
+
+    ${prio.recommendation ? `<div class="mt-2 text-[10px] text-amber-300">💡 ${prio.recommendation}</div>` : ''}
+
+    ${tips.length ? `<div class="mt-2 panel2 p-2 text-[11px] space-y-0.5">
+      ${tips.map(t=>`<div class="text-amber-300">⚠️ ${t}</div>`).join('')}
+    </div>` : ''}
+
+    <details class="mt-3 text-[11px]">
+      <summary class="text-slate-400 hover:text-slate-200 cursor-pointer">▸ Переданные магазины (${p.allLeads.length})</summary>
+      ${leadsListHtml(p.allLeads)}
+    </details>
+  </div>`;
+}
+
+function scoreBreakdownHtml(p){
+  const b=p.scoreBreakdown;
+  return `<div class="text-xs mt-2 space-y-1">
+    <div class="flex justify-between"><span>🔗 Подключения · ${p.connections}×50</span><b class="num">${b.connections}</b></div>
+    <div class="flex justify-between"><span>💰 MRR · ${U.fmtUZSk(p.factMrr)} ÷ 380K × 50</span><b class="num">${b.mrr}</b></div>
+    <div class="flex justify-between"><span>🎯 Бонус % плана</span><b class="num">${b.planBonus}</b></div>
+    <div class="flex justify-between"><span>📈 HQ-конверсия (3 этапа)</span><b class="num">${b.hqBonus}</b></div>
+    <div class="flex justify-between"><span>📈 SQL-конверсия</span><b class="num">${b.sqlBonus}</b></div>
+    <div class="flex justify-between"><span>✅ Daily check-in × ${p.dailyCheckins}</span><b class="num">${b.checkins}</b></div>
+    <div class="flex justify-between"><span>📅 Weekly plan</span><b class="num">${b.weekly}</b></div>
+    <div class="flex justify-between border-t border-slate-700 pt-1.5 mt-1.5"><b>Итого</b><b class="num text-amber-300">${p.totalPoints}</b></div>
+  </div>`;
+}
+function aggregateChannel(all){
+  const sum = (k)=>all.reduce((s,p)=>s+(p[k]||0),0);
+  const planMrr=sum('planMrr'), factMrr=sum('factMrr');
+  const wd=all[0]?.workingDaysMonth||CFG.WORKING_DAYS_DEFAULT;
+  const passed=all[0]?.passedDays||U.todayWorkingDayIndex();
+  return {
+    name:'Канал', planMrr, factMrr,
+    forecast: Calc.forecast(planMrr,factMrr,passed,wd),
+    dailyPlanMrr: Calc.dailyPlanMrr(planMrr,factMrr,Math.max(0,wd-passed))
+  };
+}
+function filterPartners(all,f){
+  let list=[...all];
+  if(f.name) list=list.filter(p=>p.name.toLowerCase().includes(f.name.toLowerCase()));
+  if(f.region) list=list.filter(p=>p.region===f.region);
+  if(f.type) list=list.filter(p=>p.type===f.type);
+  if(f.sort==='pct') list.sort((a,b)=>U.pct(b.factMrr,b.planMrr)-U.pct(a.factMrr,a.planMrr));
+  else if(f.sort==='mrr') list.sort((a,b)=>b.factMrr-a.factMrr);
+  else list.sort((a,b)=>b.totalPoints-a.totalPoints);
+  return list;
+}
+
+/* =========================================================
+   APP
+   ========================================================= */
+const App = {
+  state: {
+    partners: [], selectedId: null, tab: 'main', loading: false, error: null,
+    lastUpdated: null, filter: {name:'',region:'',type:'',sort:'points'},
+    leadsFilter: {zone:'all', name:'', region:''}
+  },
+
+  init(){
+    document.querySelectorAll('.tab').forEach(el=>{
+      el.addEventListener('click',()=>this.go(el.dataset.tab));
+    });
+    document.getElementById('refreshBtn').onclick=()=>this.load();
+    document.getElementById('snapshotBtn').onclick=()=>this.saveSnapshot();
+    document.getElementById('execBtn').onclick=()=>this.openExec();
+    document.getElementById('themeBtn').onclick=()=>this.toggleTheme();
+    this.syncThemeIcon();
+    document.getElementById('partnerSel').addEventListener('change',e=>{
+      this.state.selectedId = e.target.value==='__channel'?null:parseInt(e.target.value,10);
+      localStorage.setItem('billz.partner', e.target.value);
+      this.render();
+    });
+    const saved = localStorage.getItem('billz.partner');
+    if(saved) this.state.selectedId = saved==='__channel'?null:parseInt(saved,10);
+    const qp = new URLSearchParams(location.search).get('partner');
+    if(qp) this.state.selectedId=parseInt(qp,10);
+    this.load();
+  },
+
+  async load(){
+    this.state.loading=true; this.state.error=null;
+    document.getElementById('loadingBanner').style.display='block';
+    document.getElementById('errorBanner').style.display='none';
+    document.getElementById('staleBanner').style.display='none';
+    try{
+      const {factRows,peredRows,sqlRows} = await Sheets.loadAll();
+      const fact = Parse.parseFactSheet(factRows);
+      const hq   = Parse.parsePeredacha(peredRows);
+      const sql  = Parse.parseSql(sqlRows);
+      this.state.partners = aggregatePartners(fact, hq, sql);
+      this.state.lastUpdated = new Date();
+      this.refreshPartnerSelect();
+      U.toast('Данные обновлены');
+    }catch(e){
+      console.error(e);
+      this.state.error = e.message || String(e);
+      const eb=document.getElementById('errorBanner');
+      eb.style.display='block';
+      document.getElementById('errorMsg').textContent = this.state.error;
+      if(this.state.partners.length){
+        document.getElementById('staleBanner').style.display='block';
+        document.getElementById('staleTime').textContent = this.state.lastUpdated?.toLocaleTimeString('ru-RU')||'—';
+      }
+    }
+    this.state.loading=false;
+    document.getElementById('loadingBanner').style.display='none';
+    document.getElementById('updatedAt').textContent = this.state.lastUpdated?.toLocaleString('ru-RU') || '—';
+    this.render();
+  },
+
+  refreshPartnerSelect(){
+    const sel=document.getElementById('partnerSel');
+    sel.innerHTML = `<option value="__channel">— Весь канал —</option>` +
+      this.state.partners.map(p=>`<option value="${p.id}">${p.name} ${p.status!=='Active'?'('+p.status+')':''}</option>`).join('');
+    sel.value = this.state.selectedId==null?'__channel':String(this.state.selectedId);
+  },
+
+  go(tab){
+    this.state.tab=tab;
+    document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));
+    ['main','stats','leads','forecast','scoring','daily'].forEach(t=>{
+      document.getElementById('tab-'+t).style.display = t===tab?'block':'none';
+    });
+    this.render();
+  },
+
+  selectPartner(id){
+    this.state.selectedId=id;
+    document.getElementById('partnerSel').value=String(id);
+    localStorage.setItem('billz.partner',String(id));
+    this.go('main');
+  },
+
+  openExec(){
+    if(sessionStorage.getItem('billz.exec')==='1'){
+      this.showExec();
+    } else {
+      document.getElementById('execGate').style.display='flex';
+      setTimeout(()=>document.getElementById('execPwd').focus(),50);
+    }
+  },
+  tryExecLogin(){
+    const v=document.getElementById('execPwd').value;
+    if(v===CFG.EXEC_PASSWORD){
+      sessionStorage.setItem('billz.exec','1');
+      document.getElementById('execGate').style.display='none';
+      document.getElementById('execErr').style.display='none';
+      this.showExec();
+    } else {
+      document.getElementById('execErr').style.display='block';
+    }
+  },
+  showExec(){
+    this.state.tab='main';
+    document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+    ['stats','leads','forecast','scoring','daily'].forEach(t=>document.getElementById('tab-'+t).style.display='none');
+    document.getElementById('tab-main').style.display='block';
+    document.getElementById('tab-main').innerHTML = Views.exec(this.state.partners);
+  },
+
+  toggleTheme(){
+    const cur = document.documentElement.getAttribute('data-theme')||'dark';
+    const next = cur==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    localStorage.setItem('billz.theme',next);
+    this.syncThemeIcon();
+  },
+  syncThemeIcon(){
+    const t=document.documentElement.getAttribute('data-theme')||'dark';
+    const btn=document.getElementById('themeBtn');
+    if(btn) btn.textContent = t==='dark' ? '☀️' : '🌙';
+  },
+
+  saveDaily(){
+    const local = JSON.parse(localStorage.getItem('billz.daily')||'{}');
+    const today = new Date().toISOString().slice(0,10);
+    const td = local[today] || {};
+    document.querySelectorAll('.d-input').forEach(inp=>{
+      const pid=inp.dataset.pid, f=inp.dataset.f;
+      if(!td[pid]) td[pid]={};
+      td[pid][f] = inp.type==='checkbox' ? inp.checked : inp.value;
+    });
+    local[today]=td;
+    localStorage.setItem('billz.daily', JSON.stringify(local));
+    U.toast('Сохранено локально');
+  },
+
+  async saveSnapshot(){
+    const partners = this.state.partners;
+    if(!partners.length){ U.toast('⚠️ Нет данных для снимка'); return; }
+
+    const btn = document.getElementById('snapshotBtn');
+    btn.disabled = true; btn.textContent = '⏳ Сохраняю…';
+
+    try {
+      const now = new Date();
+      const pad2 = n => String(n).padStart(2,'0');
+      const dateStr = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
+      const snapId = 'snap_' + dateStr.replace(/-/g,'') + '_' + pad2(now.getHours()) + pad2(now.getMinutes());
+      const ts = now.toISOString();
+      const month = dateStr.slice(0,7);
+
+      // Определяем период
+      const y = now.getFullYear(), m = now.getMonth()+1;
+      let period;
+      if(y===2026 && m>=5 && m<=7) period = '2026-Q2+';
+      else if(m>=8 && m<=10)  period = y+'-Q3';
+      else if(m>=11 || m<=1)  period = (m>=11?y:y-1)+'-Q4';
+      else                    period = y+'-Q1';
+
+      const periodDates = {
+        '2026-Q2+': {start:'2026-05-23', end:'2026-07-31'}
+      };
+      const pd = periodDates[period] || {start: dateStr, end: dateStr};
+
+      // Категории в scoreBreakdown → ключи для Journal
+      const catMap = [
+        {key:'connections',  cat:'connections',     desc: p=> p.connections+' подключений × 50',                                  raw: p=> 'connections='+p.connections},
+        {key:'mrr',          cat:'mrr',             desc: p=> 'MRR '+Math.round(p.factMrr)+' ÷ 380K × 50',                       raw: p=> 'fact_mrr='+Math.round(p.factMrr)},
+        {key:'planBonus',    cat:'plan_bonus',      desc: p=> {const pct=p.planMrr>0?Math.round(p.factMrr/p.planMrr*100):0; return pct+'% плана → +'+p.scoreBreakdown.planBonus;}, raw: p=> 'fact='+Math.round(p.factMrr)+',plan='+Math.round(p.planMrr)+',pct='+(p.planMrr>0?Math.round(p.factMrr/p.planMrr*100):0)},
+        {key:'hqBonus',      cat:'hq_conversion',   desc: p=> 'HQ этапы: '+(p.hqStages||[0,0,0]).map(s=>Math.round(s)+'%').join('/'), raw: p=> 'transferred='+p.hq.transferred+',connected='+p.hq.connected+',activated='+p.hq.activated+',paid='+p.hq.paid},
+        {key:'sqlBonus',     cat:'sql_conversion',   desc: p=> 'SQL: триал '+Math.round(p.crSqlTrial||0)+'%, оплата '+Math.round(p.crSqlPaid||0)+'%', raw: p=> 'transferred='+p.sql.transferred+',trials='+p.sql.trials+',paid='+p.sql.paid},
+        {key:'checkins',     cat:'daily_checkin',    desc: p=> (p.dailyCheckins||0)+' дней check-in',                             raw: p=> 'checkins='+(p.dailyCheckins||0)},
+        {key:'weekly',       cat:'weekly_plan',      desc: p=> 'Weekly план: '+(p.weeklyPlanDone?'да':'нет'),                     raw: p=> 'weekly='+(p.weeklyPlanDone?1:0)},
+      ];
+
+      const journalRows = [];
+      const balanceRows = [];
+
+      partners.forEach(p => {
+        const bd = p.scoreBreakdown;
+        catMap.forEach(cm => {
+          const normName = p.name.toLowerCase().replace(/\s+/g,'_').slice(0,30);
+          journalRows.push([
+            snapId, ts, dateStr, period, month,
+            p.name, (p.region||'').trim(), p.status,
+            cm.cat, bd[cm.key], cm.desc(p), cm.raw(p),
+            p.totalPoints, p.levelInfo.level, p.rank,
+            dateStr.replace(/-/g,'') + '_' + normName + '_' + cm.cat
+          ]);
+        });
+
+        balanceRows.push([
+          p.name, period, pd.start, pd.end,
+          p.totalPoints, p.levelInfo.level, p.levelInfo.title, p.rank,
+          snapId, ts, p.status
+        ]);
+      });
+
+      const payload = {
+        snapshot_id: snapId,
+        timestamp: ts,
+        date: dateStr,
+        period: period,
+        partners_count: partners.length,
+        rows: journalRows,
+        balances: balanceRows
+      };
+
+      // GAS Web App делает redirect 302 → CORS блокирует обычный fetch.
+      // Единственный надёжный способ: no-cors без Content-Type заголовка.
+      // Браузер отправит body как text/plain (simple request, без preflight).
+      // GAS получит данные в e.postData.contents. Ответ — opaque (не читаем).
+      await fetch(CFG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify(payload)
+      });
+
+      U.toast('✅ Снимок отправлен: ' + snapId + ' (' + journalRows.length + ' строк, ' + partners.length + ' партнёров)');
+
+    } catch(err) {
+      console.error('Snapshot error:', err);
+      U.toast('❌ Ошибка снимка: ' + (err.message||err));
+    } finally {
+      btn.disabled = false; btn.textContent = '📸 Снимок';
+    }
+  },
+
+  bindStatsFilters(){
+    const fName=document.getElementById('fName');
+    if(!fName) return;
+    fName.addEventListener('input', e=>{ this.state.filter.name=e.target.value; this.renderTab('stats'); });
+    document.getElementById('fRegion').addEventListener('change', e=>{ this.state.filter.region=e.target.value; this.renderTab('stats'); });
+    document.getElementById('fType').addEventListener('change',   e=>{ this.state.filter.type=e.target.value;   this.renderTab('stats'); });
+    document.getElementById('fSort').addEventListener('change',   e=>{ this.state.filter.sort=e.target.value;   this.renderTab('stats'); });
+  },
+
+  render(){
+    if(this.state.loading && !this.state.partners.length) return;
+    const all = this.state.partners;
+    const p = this.state.selectedId==null ? null : all.find(x=>x.id===this.state.selectedId);
+
+    document.getElementById('tab-main').innerHTML     = Views.main(p, all);
+    document.getElementById('tab-stats').innerHTML    = Views.stats(all, this.state.filter);
+    document.getElementById('tab-leads').innerHTML    = Views.leads(p, all);
+    document.getElementById('tab-forecast').innerHTML = Views.forecast(p, all);
+    document.getElementById('tab-scoring').innerHTML  = Views.scoring(p, all);
+    document.getElementById('tab-daily').innerHTML    = Views.daily(all);
+    this.bindStatsFilters();
+    this.bindLeadsFilters();
+  },
+
+  bindLeadsFilters(){
+    const box = document.getElementById('leadsFilterBox');
+    if(!box) return;
+    box.querySelectorAll('.leads-fchip').forEach(el=>{
+      el.addEventListener('click',()=>{
+        this.state.leadsFilter.zone = el.dataset.zone;
+        this.renderLeadsTab();
+      });
+    });
+    const search = document.getElementById('lfName');
+    if(search) search.addEventListener('input', e=>{ this.state.leadsFilter.name=e.target.value; this.renderLeadsTab(); });
+    const region = document.getElementById('lfRegion');
+    if(region) region.addEventListener('change', e=>{ this.state.leadsFilter.region=e.target.value; this.renderLeadsTab(); });
+  },
+
+  renderLeadsTab(){
+    const all = this.state.partners;
+    const p = this.state.selectedId==null ? null : all.find(x=>x.id===this.state.selectedId);
+    document.getElementById('tab-leads').innerHTML = Views.leads(p, all);
+    this.bindLeadsFilters();
+    // восстановить фокус в поиске
+    const s=document.getElementById('lfName');
+    if(s && this.state.leadsFilter.name){ s.focus(); const v=s.value; s.value=''; s.value=v; }
+  },
+
+  renderTab(tab){
+    if(tab==='stats'){
+      document.getElementById('tab-stats').innerHTML = Views.stats(this.state.partners, this.state.filter);
+      const fName=document.getElementById('fName');
+      if(fName){ fName.focus(); const v=fName.value; fName.value=''; fName.value=v; }
+      this.bindStatsFilters();
+    }
+  }
+};
+
+window.App = App;
+window.addEventListener('DOMContentLoaded',()=>App.init());
+</script>
+</body>
+</html>
