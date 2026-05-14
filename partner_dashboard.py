@@ -188,7 +188,7 @@ def draw_admin_dashboard():
     
     # 2. Partners with sales THIS month (new Chargebee clients)
     query_active_partners = """
-    SELECT DISTINCT c.cf_support_manager as partner
+    SELECT c.cf_support_manager as partner, COUNT(DISTINCT c.customer_id) as sales_count
     FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
     JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
         ON c.customer_id = sub.customer_id
@@ -197,6 +197,8 @@ def draw_admin_dashboard():
       AND c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
       AND LOWER(c.cf_support_manager) LIKE '%partner%'
+    GROUP BY c.cf_support_manager
+    ORDER BY sales_count DESC
     """
     active_partners_df = client.query(query_active_partners).to_dataframe()
     active_partners_count = len(active_partners_df)
@@ -261,7 +263,7 @@ def draw_admin_dashboard():
     # Partners with sales this month
     st.markdown(f"#### 🟢 Партнёры с продажами в этом месяце ({active_partners_count})")
     if not active_partners_df.empty:
-        st.dataframe(active_partners_df.rename(columns={"partner": "Партнёр"}), use_container_width=True, hide_index=True)
+        st.dataframe(active_partners_df.rename(columns={"partner": "Партнёр", "sales_count": "Продажи"}), use_container_width=True, hide_index=True)
     else:
         st.info("В этом месяце нет продаж.")
     
