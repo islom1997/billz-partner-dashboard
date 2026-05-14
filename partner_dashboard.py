@@ -164,34 +164,29 @@ def draw_main_dashboard(data):
     st.markdown("#### 📈 Подключения по месяцам")
     first_name = data['first_name']
     client = get_bq_client()
-    query_monthly = """
+    safe_name = first_name.replace("'", "\\'")
+    query_monthly = f"""
     SELECT 
-        FORMAT_TIMESTAMP('%%Y-%%m', c.created_at) as month,
+        FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
         COUNT(DISTINCT c.customer_id) as connections
     FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
     JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
         ON c.customer_id = sub.customer_id
-    WHERE LOWER(c.cf_support_manager) LIKE LOWER(@partner)
+    WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
       AND sub.status IN ('active', 'in_trial')
-      AND c.created_at >= TIMESTAMP_SUB(TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH), INTERVAL 12 MONTH)
+      AND DATE(c.created_at) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
     GROUP BY month
     ORDER BY month
     """
-    from google.cloud.bigquery import ScalarQueryParameter, QueryJobConfig
-    job_config = QueryJobConfig(
-        query_parameters=[
-            ScalarQueryParameter("partner", "STRING", f"%{first_name}%")
-        ]
-    )
     try:
-        monthly_df = client.query(query_monthly, job_config=job_config).to_dataframe()
+        monthly_df = client.query(query_monthly).to_dataframe()
         if not monthly_df.empty:
             monthly_df = monthly_df.set_index('month')
             st.line_chart(monthly_df, use_container_width=True)
         else:
             st.info("Нет данных для графика.")
-    except Exception:
-        st.info("Не удалось загрузить график.")
+    except Exception as e:
+        st.warning(f"Ошибка загрузки графика: {e}")
     
     st.write("---")
     st.markdown(f"#### 🆕 Новые клиенты в этом месяце ({data['connections_month']})")
