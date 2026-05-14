@@ -200,53 +200,50 @@ def draw_leaderboard(data):
     
     partner_first = data['first_name'].lower()
     
-    col_left, col_right = st.columns(2)
-    
     # --- Ranking by NEW clients this month ---
-    with col_left:
-        st.markdown("#### 🆕 По новым клиентам (этот месяц)")
-        new_df = lb_df[lb_df['new_this_month'] > 0].sort_values('new_this_month', ascending=False).reset_index(drop=True)
-        if not new_df.empty:
-            new_df.insert(0, 'rank', range(1, len(new_df) + 1))
-            
-            my_rank_new = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
-            if len(my_rank_new) > 0:
-                st.markdown(f"Ваше место: **#{my_rank_new[0]}** из {len(new_df)}")
-            else:
-                st.markdown("У вас пока нет новых клиентов в этом месяце")
-            
-            display_new = new_df[['rank', 'partner', 'new_this_month']].copy()
-            display_new.columns = ["#", "Партнёр", "Новые клиенты"]
-            
-            def highlight_new(row):
-                if partner_first in str(new_df.iloc[row.name]['partner']).lower():
-                    return ['background-color: #1e3a5f'] * len(row)
-                return [''] * len(row)
-            
-            st.dataframe(display_new.style.apply(highlight_new, axis=1), use_container_width=True, hide_index=True)
+    st.markdown("#### 🆕 По новым клиентам (этот месяц)")
+    new_df = lb_df[lb_df['new_this_month'] > 0].sort_values('new_this_month', ascending=False).reset_index(drop=True)
+    if not new_df.empty:
+        new_df.insert(0, 'rank', range(1, len(new_df) + 1))
+        
+        my_rank_new = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
+        if len(my_rank_new) > 0:
+            st.markdown(f"Ваше место: **#{my_rank_new[0]}** из {len(new_df)}")
         else:
-            st.info("В этом месяце пока нет продаж.")
-    
-    # --- Ranking by TOTAL clients ---
-    with col_right:
-        st.markdown("#### 📊 По общему числу клиентов")
-        total_df = lb_df.sort_values('total_clients', ascending=False).reset_index(drop=True)
-        total_df.insert(0, 'rank', range(1, len(total_df) + 1))
+            st.markdown("У вас пока нет новых клиентов в этом месяце")
         
-        my_rank_total = total_df[total_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
-        if len(my_rank_total) > 0:
-            st.markdown(f"Ваше место: **#{my_rank_total[0]}** из {len(total_df)}")
+        display_new = new_df[['rank', 'partner', 'new_this_month']].copy()
+        display_new.columns = ["#", "Партнёр", "Новые клиенты"]
         
-        display_total = total_df[['rank', 'partner', 'total_clients', 'total_mrr']].copy()
-        display_total.columns = ["#", "Партнёр", "Всего клиентов", "MRR (UZS)"]
-        display_total["MRR (UZS)"] = display_total["MRR (UZS)"].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
-        
-        def highlight_total(row):
-            if partner_first in str(total_df.iloc[row.name]['partner']).lower():
+        def highlight_new(row):
+            if partner_first in str(new_df.iloc[row.name]['partner']).lower():
                 return ['background-color: #1e3a5f'] * len(row)
             return [''] * len(row)
         
-        st.dataframe(display_total.style.apply(highlight_total, axis=1), use_container_width=True, hide_index=True)
+        st.dataframe(display_new.style.apply(highlight_new, axis=1), use_container_width=True, hide_index=True)
+    else:
+        st.info("В этом месяце пока нет продаж.")
+    
+    st.write("---")
+    
+    # --- Ranking by TOTAL clients ---
+    st.markdown("#### 📊 По общему числу клиентов")
+    total_df = lb_df.sort_values('total_clients', ascending=False).reset_index(drop=True)
+    total_df.insert(0, 'rank', range(1, len(total_df) + 1))
+    
+    my_rank_total = total_df[total_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
+    if len(my_rank_total) > 0:
+        st.markdown(f"Ваше место: **#{my_rank_total[0]}** из {len(total_df)}")
+    
+    display_total = total_df[['rank', 'partner', 'total_clients']].copy()
+    display_total.columns = ["#", "Партнёр", "Всего клиентов"]
+    
+    def highlight_total(row):
+        if partner_first in str(total_df.iloc[row.name]['partner']).lower():
+            return ['background-color: #1e3a5f'] * len(row)
+        return [''] * len(row)
+    
+    st.dataframe(display_total.style.apply(highlight_total, axis=1), use_container_width=True, hide_index=True)
 
 
 # --- ADMIN DASHBOARD ---
