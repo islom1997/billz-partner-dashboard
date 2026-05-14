@@ -169,10 +169,11 @@ def draw_main_dashboard(data):
         st.dataframe(display_sdf, use_container_width=True, hide_index=True)
     else:
         st.info("В этом месяце пока нет новых клиентов.")
-    
-    # --- Partner Leaderboard ---
-    st.write("---")
-    st.markdown("#### 🏆 Рейтинг партнёров")
+
+
+def draw_leaderboard(data):
+    """Draws partner leaderboard in a separate tab."""
+    st.header("🏆 Рейтинг партнёров")
     
     client = get_bq_client()
     query_leaderboard = """
@@ -190,33 +191,62 @@ def draw_main_dashboard(data):
       AND c.cf_support_manager != ''
       AND LOWER(c.cf_support_manager) LIKE '%partner%'
     GROUP BY c.cf_support_manager
-    ORDER BY total_clients DESC
     """
     lb_df = client.query(query_leaderboard).to_dataframe()
     
-    if not lb_df.empty:
-        lb_df.insert(0, 'rank', range(1, len(lb_df) + 1))
+    if lb_df.empty:
+        st.info("Нет данных для рейтинга.")
+        return
+    
+    partner_first = data['first_name'].lower()
+    
+    col_left, col_right = st.columns(2)
+    
+    # --- Ranking by NEW clients this month ---
+    with col_left:
+        st.markdown("#### 🆕 По новым клиентам (этот месяц)")
+        new_df = lb_df[lb_df['new_this_month'] > 0].sort_values('new_this_month', ascending=False).reset_index(drop=True)
+        if not new_df.empty:
+            new_df.insert(0, 'rank', range(1, len(new_df) + 1))
+            
+            my_rank_new = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
+            if len(my_rank_new) > 0:
+                st.markdown(f"Ваше место: **#{my_rank_new[0]}** из {len(new_df)}")
+            else:
+                st.markdown("У вас пока нет новых клиентов в этом месяце")
+            
+            display_new = new_df[['rank', 'partner', 'new_this_month']].copy()
+            display_new.columns = ["#", "Партнёр", "Новые клиенты"]
+            
+            def highlight_new(row):
+                if partner_first in str(new_df.iloc[row.name]['partner']).lower():
+                    return ['background-color: #1e3a5f'] * len(row)
+                return [''] * len(row)
+            
+            st.dataframe(display_new.style.apply(highlight_new, axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.info("В этом месяце пока нет продаж.")
+    
+    # --- Ranking by TOTAL clients ---
+    with col_right:
+        st.markdown("#### 📊 По общему числу клиентов")
+        total_df = lb_df.sort_values('total_clients', ascending=False).reset_index(drop=True)
+        total_df.insert(0, 'rank', range(1, len(total_df) + 1))
         
-        # Find current partner's row
-        partner_first = data['first_name'].lower()
-        lb_df['is_me'] = lb_df['partner'].apply(lambda x: partner_first in x.lower())
-        my_rank = lb_df[lb_df['is_me']]['rank'].values
-        if len(my_rank) > 0:
-            st.markdown(f"Ваше место: **#{my_rank[0]}** из {len(lb_df)}")
+        my_rank_total = total_df[total_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
+        if len(my_rank_total) > 0:
+            st.markdown(f"Ваше место: **#{my_rank_total[0]}** из {len(total_df)}")
         
-        # Format for display
-        display_lb = lb_df[['rank', 'partner', 'total_clients', 'new_this_month', 'total_mrr']].copy()
-        display_lb.columns = ["#", "Партнёр", "Всего клиентов", "Новые (этот мес.)", "MRR (UZS)"]
-        display_lb["MRR (UZS)"] = display_lb["MRR (UZS)"].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
+        display_total = total_df[['rank', 'partner', 'total_clients', 'total_mrr']].copy()
+        display_total.columns = ["#", "Партнёр", "Всего клиентов", "MRR (UZS)"]
+        display_total["MRR (UZS)"] = display_total["MRR (UZS)"].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
         
-        # Highlight current partner's row
-        def highlight_me(row):
-            if partner_first in str(lb_df.iloc[row.name]['partner']).lower():
+        def highlight_total(row):
+            if partner_first in str(total_df.iloc[row.name]['partner']).lower():
                 return ['background-color: #1e3a5f'] * len(row)
             return [''] * len(row)
         
-        styled = display_lb.style.apply(highlight_me, axis=1)
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        st.dataframe(display_total.style.apply(highlight_total, axis=1), use_container_width=True, hide_index=True)
 
 
 # --- ADMIN DASHBOARD ---
@@ -355,11 +385,14 @@ def main():
     else:
         data = get_partner_data(partner_name)
         
-        tab1, tab2 = st.tabs(["Главная", "Мои клиенты"])
+        tab1, tab2, tab3 = st.tabs(["Главная", "Мои клиенты", "Рейтинг"])
         
         with tab1:
             draw_main_dashboard(data)
             
+        with tab3:
+            draw_leaderboard(data)
+        
         with tab2:
             st.header("Мои клиенты")
             
