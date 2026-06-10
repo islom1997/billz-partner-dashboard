@@ -90,12 +90,12 @@ def get_partner_data(partner_name):
     latest_subs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status = 'active'
     ),
     deduped_subs AS (
         SELECT * 
         FROM latest_subs
         WHERE rn = 1
+          AND status = 'active'
     )
     SELECT 
         COUNT(DISTINCT sub.customer_id) as connections_total
@@ -120,12 +120,12 @@ def get_partner_data(partner_name):
     latest_subs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status = 'active'
     ),
     deduped_subs AS (
         SELECT * 
         FROM latest_subs
         WHERE rn = 1
+          AND status = 'active'
     )
     SELECT DISTINCT
         c.company as client_name,
@@ -397,12 +397,12 @@ def draw_leaderboard(data):
     latest_subs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status IN ('active', 'in_trial')
     ),
     deduped_subs AS (
         SELECT * 
         FROM latest_subs
         WHERE rn = 1
+          AND status IN ('active', 'in_trial')
     )
     SELECT 
         c.cf_support_manager as partner,
@@ -480,12 +480,12 @@ def draw_admin_dashboard():
     latest_subs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status = 'active'
     ),
     deduped_subs AS (
         SELECT * 
         FROM latest_subs
         WHERE rn = 1
+          AND status = 'active'
     )
     SELECT c.cf_support_manager as partner, COUNT(DISTINCT c.customer_id) as sales_count
     FROM deduped_custs c
@@ -530,12 +530,12 @@ def draw_admin_dashboard():
     latest_subs AS (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status = 'active'
     ),
     deduped_subs AS (
         SELECT * 
         FROM latest_subs
         WHERE rn = 1
+          AND status = 'active'
     )
     SELECT 
         c.cf_support_manager as partner,
@@ -668,12 +668,12 @@ def main():
             latest_subs AS (
                 SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
                 FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-                WHERE status IN ('active', 'in_trial')
             ),
             deduped_subs AS (
                 SELECT * 
                 FROM latest_subs
                 WHERE rn = 1
+                  AND status IN ('active', 'in_trial')
             )
             SELECT DISTINCT
                 c.company as client_name,
