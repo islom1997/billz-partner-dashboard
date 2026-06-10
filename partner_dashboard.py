@@ -637,7 +637,7 @@ def main():
             from datetime import date
             from dateutil.relativedelta import relativedelta
             
-            # Month selector
+            # Month & Status selectors
             today = date.today()
             months_list = []
             for i in range(12):
@@ -645,12 +645,21 @@ def main():
                 months_list.append(date(d.year, d.month, 1))
             
             month_labels = {d: d.strftime("%B %Y") for d in months_list}
-            selected_month = st.selectbox(
-                "Выберите месяц",
-                options=months_list,
-                format_func=lambda d: month_labels[d],
-                index=0
-            )
+            
+            col_m, col_s = st.columns(2)
+            with col_m:
+                selected_month = st.selectbox(
+                    "Выберите месяц",
+                    options=months_list,
+                    format_func=lambda d: month_labels[d],
+                    index=0
+                )
+            with col_s:
+                selected_status = st.selectbox(
+                    "Фильтр по статусу в CB",
+                    options=["Все", "Активен", "В триале", "Отменен", "Не продлевается"],
+                    index=0
+                )
             
             # Build a query for all active clients directly from Chargebee
             first_name = data['first_name']
@@ -760,24 +769,40 @@ def main():
                 st.markdown(f"#### Итого бонус за месяц: <span style='color:#16a34a;'>{total_all_bonus:,} UZS</span>".replace(",", " "), unsafe_allow_html=True)
                 st.write("---")
                 
-                display_clients = my_clients_df[['client_name', 'login', 'plan_id', 'status', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
-                status_map = {
-                    "active": "Активен",
-                    "in_trial": "В триале",
-                    "cancelled": "Отменен",
-                    "non_renewing": "Не продлевается",
-                    "future": "Будущий"
+                # Filter by status if selected
+                status_filter_map = {
+                    "Активен": "active",
+                    "В триале": "in_trial",
+                    "Отменен": "cancelled",
+                    "Не продлевается": "non_renewing"
                 }
-                display_clients["status"] = display_clients["status"].map(status_map).fillna(display_clients["status"])
-                display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
-                
-                for col in ["MRR (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
-                    display_clients[col] = display_clients[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
-                
-                display_clients["Бонус продаж %"] = display_clients["Бонус продаж %"].apply(lambda x: f"{x}%")
-                display_clients["Портфель %"] = display_clients["Портфель %"].apply(lambda x: f"{x}%")
-                
-                st.dataframe(display_clients, use_container_width=True, hide_index=True)
+                if selected_status != "Все":
+                    target_status = status_filter_map[selected_status]
+                    filtered_df = my_clients_df[my_clients_df['status'] == target_status].copy()
+                else:
+                    filtered_df = my_clients_df.copy()
+
+                if not filtered_df.empty:
+                    display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
+                    status_map = {
+                        "active": "Активен",
+                        "in_trial": "В триале",
+                        "cancelled": "Отменен",
+                        "non_renewing": "Не продлевается",
+                        "future": "Будущий"
+                    }
+                    display_clients["status"] = display_clients["status"].map(status_map).fillna(display_clients["status"])
+                    display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
+                    
+                    for col in ["MRR (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
+                        display_clients[col] = display_clients[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
+                    
+                    display_clients["Бонус продаж %"] = display_clients["Бонус продаж %"].apply(lambda x: f"{x}%")
+                    display_clients["Портфель %"] = display_clients["Портфель %"].apply(lambda x: f"{x}%")
+                    
+                    st.dataframe(display_clients, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Нет клиентов с выбранным статусом подписки в этом месяце.")
             else:
                 st.info("Нет клиентов в Chargebee.")
 
