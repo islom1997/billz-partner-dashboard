@@ -1055,7 +1055,7 @@ def main():
                 with c1:
                     st.metric("Оплаченные клиенты", unique_active_clients, f"Ставка портфеля: {portfolio_pct_tier}%")
                 with c2:
-                    st.metric("Клиенты 50% (≤12 мес)", clients_50pct)
+                    st.metric("Клиенты (≤12 мес)", clients_50pct)
                 with c3:
                     st.metric("Оплаченный MRR (UZS)", f"{total_paid_mrr:,}".replace(",", " "))
                 with c4:
