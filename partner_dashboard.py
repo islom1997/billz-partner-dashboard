@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 from google.cloud import bigquery
 import numpy as np
+import plotly.express as px
 
 # --- CONFIG ---
 st.set_page_config(
@@ -833,18 +834,46 @@ def main():
                 total_portfolio_bonus = int(my_clients_df['portfolio_amount'].sum())
                 total_all_bonus = int(my_clients_df['total_bonus'].sum())
                 
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
-                    st.metric("Клиенты (активные)", active_clients_count, f"Портфель: {portfolio_pct}%")
-                with c2:
-                    st.metric("Общий MRR (UZS)", f"{total_mrr:,}".replace(",", " "))
-                with c3:
-                    st.metric("Бонус с продаж (UZS)", f"{total_sales_bonus:,}".replace(",", " "))
-                with c4:
-                    st.metric("Портфельн. доход (UZS)", f"{total_portfolio_bonus:,}".replace(",", " "))
+                col_left, col_right = st.columns([2, 1])
+                with col_left:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.metric("Клиенты (активные)", active_clients_count, f"Портфель: {portfolio_pct}%")
+                    with c2:
+                        st.metric("Общий MRR (UZS)", f"{total_mrr:,}".replace(",", " "))
+                    
+                    c3, c4 = st.columns(2)
+                    with c3:
+                        st.metric("Бонус с продаж (UZS)", f"{total_sales_bonus:,}".replace(",", " "))
+                    with c4:
+                        st.metric("Портфельн. доход (UZS)", f"{total_portfolio_bonus:,}".replace(",", " "))
+                    
+                    st.write("---")
+                    st.markdown(f"#### Итого бонус за месяц: <span style='color:#16a34a;'>{total_all_bonus:,} UZS</span>".replace(",", " "), unsafe_allow_html=True)
                 
-                st.write("---")
-                st.markdown(f"#### Итого бонус за месяц: <span style='color:#16a34a;'>{total_all_bonus:,} UZS</span>".replace(",", " "), unsafe_allow_html=True)
+                with col_right:
+                    st.markdown("<h4 style='font-size:16px; margin-bottom: 5px; text-align: center;'>Активность клиентов</h4>", unsafe_allow_html=True)
+                    activity_counts = my_clients_df[my_clients_df['Активность'] != 'Нет данных']['Активность'].value_counts().reset_index()
+                    activity_counts.columns = ['Активность', 'Количество']
+                    if not activity_counts.empty:
+                        fig = px.pie(activity_counts, names='Активность', values='Количество', 
+                                     hole=0.5, color='Активность',
+                                     color_discrete_map={
+                                         'Активные (≤1 дн)': '#16A34A', 
+                                         'В зоне риска (2-4 дн)': '#F59E0B', 
+                                         'Неактивные (>4 дн)': '#DC2626'
+                                     })
+                        fig.update_layout(
+                            margin=dict(t=0, b=0, l=0, r=0),
+                            height=200,
+                            showlegend=True,
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("Нет данных об активности")
+                
                 st.write("---")
                 
                 # Filter by status if selected
