@@ -741,7 +741,7 @@ def main():
                 sub.status as status,
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
-                COALESCE(DATE(fa.first_activated_at), DATE(c.created_at)) as created_date
+                COALESCE(DATE(fa.first_activated_at, 'Asia/Tashkent'), DATE(c.created_at, 'Asia/Tashkent')) as created_date
             FROM deduped_custs c
             JOIN deduped_subs sub ON c.customer_id = sub.customer_id
             LEFT JOIN first_activations fa ON c.customer_id = fa.customer_id
@@ -976,16 +976,16 @@ def main():
                     WHEN 'TJS' THEN i.amount_paid * 1100
                     ELSE i.amount_paid
                 END) / 100 as amount_paid,
-                DATE(i.date) as invoice_date,
+                DATE(i.date, 'Asia/Tashkent') as invoice_date,
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
-                COALESCE(DATE(fa.first_activated_at), DATE(c.created_at)) as created_date
+                COALESCE(DATE(fa.first_activated_at, 'Asia/Tashkent'), DATE(c.created_at, 'Asia/Tashkent')) as created_date
             FROM invoices_deduped i
             JOIN deduped_custs c ON i.customer_id = c.customer_id
             LEFT JOIN first_activations fa ON c.customer_id = fa.customer_id
             WHERE i.status = 'paid'
-              AND DATE(i.date) >= '{selected_payout_month}'
-              AND DATE(i.date) < '{payout_end_month}'
+              AND DATE(i.date, 'Asia/Tashkent') >= '{selected_payout_month}'
+              AND DATE(i.date, 'Asia/Tashkent') < '{payout_end_month}'
               AND LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
             ORDER BY invoice_date DESC
             """
