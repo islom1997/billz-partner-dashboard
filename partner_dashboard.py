@@ -673,7 +673,6 @@ def main():
                 SELECT * 
                 FROM latest_subs
                 WHERE rn = 1
-                  AND status IN ('active', 'in_trial')
             )
             SELECT DISTINCT
                 c.company as client_name,
@@ -697,6 +696,13 @@ def main():
                 end_of_month = selected_month + relativedelta(months=1)
                 my_clients_df = my_clients_df[my_clients_df['created_date'] < end_of_month]
                 
+                # Override MRR to 0 for inactive/cancelled clients
+                my_clients_df.loc[~my_clients_df['status'].isin(['active', 'in_trial']), 'mrr'] = 0
+
+                # Sort: active first, then by created date descending
+                my_clients_df['is_active_sort'] = my_clients_df['status'].isin(['active', 'in_trial'])
+                my_clients_df = my_clients_df.sort_values(by=['is_active_sort', 'created_date'], ascending=[False, False]).drop(columns=['is_active_sort']).reset_index(drop=True)
+
                 # Cutoff: 12 months before the selected month
                 cutoff_date = selected_month - relativedelta(months=12)
                 
@@ -721,13 +727,13 @@ def main():
                 my_clients_df['bonus_amount'] = (my_clients_df['mrr'] * my_clients_df['bonus_pct'] / 100).astype(int)
                 
                 # Portfolio Income
-                total_clients = len(my_clients_df)
+                active_clients_count = len(my_clients_df[my_clients_df['status'].isin(['active', 'in_trial'])])
                 portfolio_pct = 0
-                if total_clients >= 150:
+                if active_clients_count >= 150:
                     portfolio_pct = 20
-                elif total_clients >= 100:
+                elif active_clients_count >= 100:
                     portfolio_pct = 15
-                elif total_clients >= 50:
+                elif active_clients_count >= 50:
                     portfolio_pct = 10
                 
                 my_clients_df['portfolio_pct'] = portfolio_pct
@@ -742,7 +748,7 @@ def main():
                 
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    st.metric("Клиенты", total_clients, f"Портфель: {portfolio_pct}%")
+                    st.metric("Клиенты (активные)", active_clients_count, f"Портфель: {portfolio_pct}%")
                 with c2:
                     st.metric("Общий MRR (UZS)", f"{total_mrr:,}".replace(",", " "))
                 with c3:
