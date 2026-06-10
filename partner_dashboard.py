@@ -169,7 +169,7 @@ def draw_main_dashboard(data):
     safe_name = first_name.replace("'", "\\'")
     query_monthly = f"""
     WITH deduped_subs AS (
-        SELECT DISTINCT subscription_id, customer_id, status, cancelled_at
+        SELECT DISTINCT subscription_id, customer_id, status, created_at, cancelled_at
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
         WHERE status IN ('active', 'in_trial', 'cancelled')
     ),
@@ -182,8 +182,7 @@ def draw_main_dashboard(data):
             FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
             COUNT(DISTINCT c.customer_id) as created_count
         FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-        JOIN deduped_subs sub
-            ON c.customer_id = sub.customer_id
+        JOIN deduped_subs sub ON c.customer_id = sub.customer_id
         WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
         GROUP BY month
     ),
@@ -192,39 +191,33 @@ def draw_main_dashboard(data):
             FORMAT_TIMESTAMP('%Y-%m', sub.cancelled_at) as month,
             COUNT(DISTINCT c.customer_id) as churned_count
         FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-        JOIN deduped_subs sub
-            ON c.customer_id = sub.customer_id
+        JOIN deduped_subs sub ON c.customer_id = sub.customer_id
         WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
           AND sub.status = 'cancelled'
           AND sub.cancelled_at IS NOT NULL
         GROUP BY month
     ),
-    monthly_stats AS (
+    active_by_month AS (
         SELECT 
             m.month,
-            COALESCE(cr.created_count, 0) as created_count,
-            COALESCE(ca.churned_count, 0) as churned_count
+            COUNT(DISTINCT c.customer_id) as active_base
         FROM months m
-        LEFT JOIN created_by_month cr ON m.month = cr.month
-        LEFT JOIN cancelled_by_month ca ON m.month = ca.month
-        WHERE cr.created_count IS NOT NULL OR ca.churned_count IS NOT NULL
-    ),
-    cumulative_stats AS (
-        SELECT 
-            month,
-            created_count,
-            churned_count,
-            SUM(created_count) OVER (ORDER BY month) as cumulative_created,
-            SUM(churned_count) OVER (ORDER BY month) as cumulative_churned
-        FROM monthly_stats
+        JOIN `br-clients-02.ms_ekeppe.chargebee_customers` c ON LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
+        JOIN deduped_subs sub ON c.customer_id = sub.customer_id
+        WHERE DATE(sub.created_at) <= LAST_DAY(PARSE_DATE('%Y-%m', m.month))
+          AND (sub.cancelled_at IS NULL OR DATE(sub.cancelled_at) > LAST_DAY(PARSE_DATE('%Y-%m', m.month)))
+        GROUP BY month
     )
     SELECT 
-        month,
-        created_count,
-        churned_count,
-        (cumulative_created - cumulative_churned) as active_base
-    FROM cumulative_stats
-    WHERE PARSE_DATE('%Y-%m', month) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
+        m.month,
+        COALESCE(cr.created_count, 0) as created_count,
+        COALESCE(ca.churned_count, 0) as churned_count,
+        COALESCE(act.active_base, 0) as active_base
+    FROM months m
+    LEFT JOIN created_by_month cr ON m.month = cr.month
+    LEFT JOIN cancelled_by_month ca ON m.month = ca.month
+    LEFT JOIN active_by_month act ON m.month = act.month
+    WHERE PARSE_DATE('%Y-%m', m.month) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
     ORDER BY month
     """
     try:
@@ -274,6 +267,20 @@ def draw_main_dashboard(data):
                 ]
             )
 
+            # Text labels for bars
+            bar_text = alt.Chart(bars_df).mark_text(
+                align='center',
+                baseline='bottom',
+                dy=-3,
+                fontSize=10,
+                fontWeight='bold'
+            ).encode(
+                x=alt.X('month:N', sort=month_order),
+                xOffset='metric:N',
+                y=alt.Y('value:Q'),
+                text=alt.Text('value:Q')
+            )
+
             # Cumulative active base line
             line = alt.Chart(monthly_df).mark_line(color='#2563EB', strokeWidth=3, point=True).encode(
                 x=alt.X('month:N', sort=month_order),
@@ -284,8 +291,25 @@ def draw_main_dashboard(data):
                 ]
             )
 
-            # Dual-axis chart
-            chart = alt.layer(bars, line).resolve_scale(
+            # Text labels for active base line
+            line_text = alt.Chart(monthly_df).mark_text(
+                align='center',
+                baseline='bottom',
+                dy=-10,
+                color='#2563EB',
+                fontSize=11,
+                fontWeight='bold'
+            ).encode(
+                x=alt.X('month:N', sort=month_order),
+                y=alt.Y('active_base:Q'),
+                text=alt.Text('active_base:Q')
+            )
+
+            # Layer them together
+            bars_layer = alt.layer(bars, bar_text)
+            line_layer = alt.layer(line, line_text)
+            
+            chart = alt.layer(bars_layer, line_layer).resolve_scale(
                 y='independent'
             ).properties(height=350)
             
