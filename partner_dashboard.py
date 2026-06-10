@@ -1049,15 +1049,18 @@ def main():
                 total_historical_sales_bonus = int(payouts_df['bonus_amount'].sum())
                 total_historical_portfolio_bonus = int(payouts_df['portfolio_amount'].sum())
                 total_historical_all_bonus = int(payouts_df['total_bonus'].sum())
+                clients_50pct = payouts_df[payouts_df['bonus_pct'] == 50]['login'].nunique()
 
-                c1, c2, c3, c4 = st.columns(4)
+                c1, c2, c3, c4, c5 = st.columns(5)
                 with c1:
                     st.metric("Оплаченные клиенты", unique_active_clients, f"Ставка портфеля: {portfolio_pct_tier}%")
                 with c2:
-                    st.metric("Оплаченный MRR (UZS)", f"{total_paid_mrr:,}".replace(",", " "))
+                    st.metric("Клиенты 50% (≤12 мес)", clients_50pct)
                 with c3:
-                    st.metric("Бонус с продаж (UZS)", f"{total_historical_sales_bonus:,}".replace(",", " "))
+                    st.metric("Оплаченный MRR (UZS)", f"{total_paid_mrr:,}".replace(",", " "))
                 with c4:
+                    st.metric("Бонус с продаж (UZS)", f"{total_historical_sales_bonus:,}".replace(",", " "))
+                with c5:
                     st.metric("Портфельн. доход (UZS)", f"{total_historical_portfolio_bonus:,}".replace(",", " "))
 
                 st.write("---")
