@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 from google.cloud import bigquery
+import numpy as np
 
 # --- CONFIG ---
 st.set_page_config(
@@ -67,6 +68,25 @@ def get_bq_client():
     except (KeyError, FileNotFoundError):
         # Local dev: use gcloud ADC
         return bigquery.Client(project="br-clients-02")
+
+@st.cache_data(ttl=600)
+def load_clients_activity():
+    client = get_bq_client()
+    sql = """
+    SELECT
+      LOWER(prefix) AS login_key,
+      last_sale_date,
+      last_import_date,
+      last_login_date
+    FROM `billz-analytics.cs_data.clients_activity`
+    WHERE prefix IS NOT NULL AND prefix != ''
+    """
+    try:
+        df = client.query(sql).to_dataframe()
+        return df.drop_duplicates(subset='login_key', keep='first')
+    except Exception:
+        return pd.DataFrame()
+
 
 @st.cache_data(ttl=300)
 def get_partner_data(partner_name):
@@ -646,7 +666,7 @@ def main():
             
             month_labels = {d: d.strftime("%B %Y") for d in months_list}
             
-            col_m, col_s = st.columns(2)
+            col_m, col_s, col_a = st.columns(3)
             with col_m:
                 selected_month = st.selectbox(
                     "Выберите месяц",
@@ -656,8 +676,14 @@ def main():
                 )
             with col_s:
                 selected_status = st.selectbox(
-                    "Фильтр по активности",
+                    "Статус подписки",
                     options=["Все", "Активен", "В триале", "Отменен", "Не продлевается"],
+                    index=0
+                )
+            with col_a:
+                selected_activity = st.selectbox(
+                    "Активность",
+                    options=["Все", "Активные (≤1 дн)", "В зоне риска (2-4 дн)", "Неактивные (>4 дн)", "Нет данных"],
                     index=0
                 )
             
@@ -705,6 +731,31 @@ def main():
                 end_of_month = selected_month + relativedelta(months=1)
                 my_clients_df = my_clients_df[my_clients_df['created_date'] < end_of_month]
                 
+                # Merge with activity data from billz-analytics
+                activity_df = load_clients_activity()
+                if not activity_df.empty:
+                    my_clients_df['_login_key'] = my_clients_df['login'].str.lower()
+                    my_clients_df = my_clients_df.merge(activity_df, left_on='_login_key', right_on='login_key', how='left')
+                    my_clients_df.drop(columns=['_login_key', 'login_key'], inplace=True, errors='ignore')
+
+                    # Calculate Activity
+                    now = pd.Timestamp.now().normalize()
+                    last_sale = pd.to_datetime(my_clients_df['last_sale_date'], errors='coerce')
+                    last_import = pd.to_datetime(my_clients_df['last_import_date'], errors='coerce')
+                    last_login = pd.to_datetime(my_clients_df['last_login_date'], errors='coerce')
+
+                    # Find max active date
+                    max_active_dt = pd.concat([last_sale, last_import, last_login], axis=1).max(axis=1)
+                    days_since_active = (now - max_active_dt).dt.days
+
+                    my_clients_df['Активность'] = np.where(
+                        days_since_active.isna(), 'Нет данных',
+                        np.where(days_since_active > 4, 'Неактивные (>4 дн)',
+                        np.where(days_since_active <= 1, 'Активные (≤1 дн)', 'В зоне риска (2-4 дн)'))
+                    )
+                else:
+                    my_clients_df['Активность'] = 'Нет данных'
+
                 # Override MRR to 0 for inactive/cancelled clients
                 my_clients_df.loc[~my_clients_df['status'].isin(['active', 'in_trial']), 'mrr'] = 0
 
@@ -776,14 +827,17 @@ def main():
                     "Отменен": "cancelled",
                     "Не продлевается": "non_renewing"
                 }
+                filtered_df = my_clients_df.copy()
                 if selected_status != "Все":
                     target_status = status_filter_map[selected_status]
-                    filtered_df = my_clients_df[my_clients_df['status'] == target_status].copy()
-                else:
-                    filtered_df = my_clients_df.copy()
+                    filtered_df = filtered_df[filtered_df['status'] == target_status]
+                
+                # Filter by activity if selected
+                if selected_activity != "Все":
+                    filtered_df = filtered_df[filtered_df['Активность'] == selected_activity]
 
                 if not filtered_df.empty:
-                    display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
+                    display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'Активность', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
                     status_map = {
                         "active": "Активен",
                         "in_trial": "В триале",
@@ -792,17 +846,17 @@ def main():
                         "future": "Будущий"
                     }
                     display_clients["status"] = display_clients["status"].map(status_map).fillna(display_clients["status"])
-                    display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
+                    display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "Активность", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
                     
                     for col in ["MRR (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
                         display_clients[col] = display_clients[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
                     
-                    display_clients["Бонус продаж %"] = display_clients["Бонус продаж %"].apply(lambda x: f"{x}%")
-                    display_clients["Портфель %"] = display_clients["Портфель %"].apply(lambda x: f"{x}%")
+                    display_clients["Бонус продаж %"] = display_clients["Бонус продаж %"].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "—")
+                    display_clients["Портфель %"] = display_clients["Портфель %"].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "—")
                     
                     st.dataframe(display_clients, use_container_width=True, hide_index=True)
                 else:
-                    st.info("Нет клиентов с выбранным статусом подписки в этом месяце.")
+                    st.info("Нет клиентов с выбранными фильтрами в этом месяце.")
             else:
                 st.info("Нет клиентов в Chargebee.")
 
