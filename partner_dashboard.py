@@ -662,21 +662,9 @@ def main():
             
             # Month & Status selectors
             today = date.today()
-            months_list = []
-            for i in range(12):
-                d = today - relativedelta(months=i)
-                months_list.append(date(d.year, d.month, 1))
+            selected_month = date(today.year, today.month, 1)
             
-            month_labels = {d: d.strftime("%B %Y") for d in months_list}
-            
-            col_m, col_s, col_a = st.columns(3)
-            with col_m:
-                selected_month = st.selectbox(
-                    "Выберите месяц",
-                    options=months_list,
-                    format_func=lambda d: month_labels[d],
-                    index=0
-                )
+            col_s, col_a = st.columns(2)
             with col_s:
                 selected_status = st.selectbox(
                     "Статус подписки",
