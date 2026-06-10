@@ -700,6 +700,14 @@ def main():
                 FROM latest_subs
                 WHERE rn = 1
             ),
+            first_activations AS (
+                SELECT 
+                    customer_id, 
+                    MIN(activated_at) as first_activated_at
+                FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+                WHERE activated_at IS NOT NULL
+                GROUP BY customer_id
+            ),
             invoices_deduped AS (
                 SELECT * FROM (
                     SELECT i.*, ROW_NUMBER() OVER(PARTITION BY i.invoice_id ORDER BY i.loaded_at DESC) AS rn
@@ -733,9 +741,10 @@ def main():
                 sub.status as status,
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
-                DATE(c.created_at) as created_date
+                COALESCE(DATE(fa.first_activated_at), DATE(c.created_at)) as created_date
             FROM deduped_custs c
             JOIN deduped_subs sub ON c.customer_id = sub.customer_id
+            LEFT JOIN first_activations fa ON c.customer_id = fa.customer_id
             LEFT JOIN debt_summary d ON c.customer_id = d.customer_id
             WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
             ORDER BY created_date DESC
