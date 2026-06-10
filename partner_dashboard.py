@@ -169,32 +169,67 @@ def draw_main_dashboard(data):
     safe_name = first_name.replace("'", "\\'")
     query_monthly = f"""
     WITH deduped_subs AS (
-        SELECT DISTINCT subscription_id, customer_id, status
+        SELECT DISTINCT subscription_id, customer_id, status, cancelled_at
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
         WHERE status IN ('active', 'in_trial', 'cancelled')
+    ),
+    months AS (
+        SELECT DISTINCT FORMAT_TIMESTAMP('%Y-%m', created_at) as month
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    created_by_month AS (
+        SELECT 
+            FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
+            COUNT(DISTINCT c.customer_id) as created_count
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+        JOIN deduped_subs sub
+            ON c.customer_id = sub.customer_id
+        WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
+        GROUP BY month
+    ),
+    cancelled_by_month AS (
+        SELECT 
+            FORMAT_TIMESTAMP('%Y-%m', sub.cancelled_at) as month,
+            COUNT(DISTINCT c.customer_id) as churned_count
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+        JOIN deduped_subs sub
+            ON c.customer_id = sub.customer_id
+        WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
+          AND sub.status = 'cancelled'
+          AND sub.cancelled_at IS NOT NULL
+        GROUP BY month
+    ),
+    monthly_stats AS (
+        SELECT 
+            m.month,
+            COALESCE(cr.created_count, 0) as created_count,
+            COALESCE(ca.churned_count, 0) as churned_count
+        FROM months m
+        LEFT JOIN created_by_month cr ON m.month = cr.month
+        LEFT JOIN cancelled_by_month ca ON m.month = ca.month
+        WHERE cr.created_count IS NOT NULL OR ca.churned_count IS NOT NULL
+    ),
+    cumulative_stats AS (
+        SELECT 
+            month,
+            created_count,
+            churned_count,
+            SUM(created_count) OVER (ORDER BY month) as cumulative_created,
+            SUM(churned_count) OVER (ORDER BY month) as cumulative_churned
+        FROM monthly_stats
     )
-    SELECT
-        FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
-        CASE WHEN sub.status IN ('active', 'in_trial') THEN 'Активные' ELSE 'Отток' END as status,
-        COUNT(DISTINCT c.customer_id) as connections
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN deduped_subs sub
-        ON c.customer_id = sub.customer_id
-    WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
-      AND DATE(c.created_at) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
-    GROUP BY month, status
-    ORDER BY month, status
+    SELECT 
+        month,
+        created_count,
+        churned_count,
+        (cumulative_created - cumulative_churned) as active_base
+    FROM cumulative_stats
+    WHERE PARSE_DATE('%Y-%m', month) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
+    ORDER BY month
     """
     try:
         monthly_df = client.query(query_monthly).to_dataframe()
         if not monthly_df.empty:
-            # Fill missing status combinations with 0 to ensure cumulative sum doesn't skip months
-            all_months = monthly_df['month'].unique()
-            all_statuses = ['Активные', 'Отток']
-            grid = pd.MultiIndex.from_product([all_months, all_statuses], names=['month', 'status']).to_frame().reset_index(drop=True)
-            monthly_df = pd.merge(grid, monthly_df, on=['month', 'status'], how='left')
-            monthly_df['connections'] = monthly_df['connections'].fillna(0).astype(int)
-
             month_names = {
                 '01': 'Янв', '02': 'Фев', '03': 'Мар', '04': 'Апр',
                 '05': 'Май', '06': 'Июн', '07': 'Июл', '08': 'Авг',
@@ -204,26 +239,56 @@ def draw_main_dashboard(data):
             monthly_df['month'] = monthly_df['month'].apply(
                 lambda x: f"{month_names[x[5:]]} {x[:4]}"
             )
-            # Sort chronologically to compute cumulative sum correctly
-            monthly_df = monthly_df.sort_values(['sort_key', 'status']).reset_index(drop=True)
-            monthly_df['cumulative_connections'] = monthly_df.groupby('status')['connections'].cumsum()
-            month_order = monthly_df.sort_values('sort_key')['month'].unique().tolist()
+            
+            # Sort chronologically
+            monthly_df = monthly_df.sort_values('sort_key').reset_index(drop=True)
+            month_order = monthly_df['month'].tolist()
+
+            # Melt for the grouped bar chart
+            bars_df = monthly_df.melt(
+                id_vars=['month', 'sort_key'],
+                value_vars=['created_count', 'churned_count'],
+                var_name='metric',
+                value_name='value'
+            )
+            bars_df['metric'] = bars_df['metric'].map({
+                'created_count': 'Новые подключения',
+                'churned_count': 'Отток'
+            })
             
             import altair as alt
-            chart = alt.Chart(monthly_df).mark_bar().encode(
+            
+            # Grouped bars
+            bars = alt.Chart(bars_df).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
                 x=alt.X('month:N', sort=month_order, title='Месяц'),
-                y=alt.Y('cumulative_connections:Q', title='Подключения (накопительно)'),
-                color=alt.Color('status:N', title='Статус', scale=alt.Scale(
-                    domain=['Активные', 'Отток'],
-                    range=['#2563EB', '#EF4444']
+                xOffset='metric:N',
+                y=alt.Y('value:Q', title='Количество новых / оттока'),
+                color=alt.Color('metric:N', title='Метрика', scale=alt.Scale(
+                    domain=['Новые подключения', 'Отток'],
+                    range=['#10B981', '#EF4444']
                 )),
                 tooltip=[
                     alt.Tooltip('month:N', title='Месяц'),
-                    alt.Tooltip('status:N', title='Статус'),
-                    alt.Tooltip('connections:Q', title='Новых за месяц'),
-                    alt.Tooltip('cumulative_connections:Q', title='Всего (кумулятивно)')
+                    alt.Tooltip('metric:N', title='Метрика'),
+                    alt.Tooltip('value:Q', title='Количество')
                 ]
+            )
+
+            # Cumulative active base line
+            line = alt.Chart(monthly_df).mark_line(color='#2563EB', strokeWidth=3, point=True).encode(
+                x=alt.X('month:N', sort=month_order),
+                y=alt.Y('active_base:Q', title='Активная база'),
+                tooltip=[
+                    alt.Tooltip('month:N', title='Месяц'),
+                    alt.Tooltip('active_base:Q', title='Активная база')
+                ]
+            )
+
+            # Dual-axis chart
+            chart = alt.layer(bars, line).resolve_scale(
+                y='independent'
             ).properties(height=350)
+            
             st.altair_chart(chart, use_container_width=True)
         else:
             st.info("Нет данных для графика.")
