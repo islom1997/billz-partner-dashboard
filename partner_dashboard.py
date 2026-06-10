@@ -646,7 +646,7 @@ def main():
     else:
         data = get_partner_data(partner_name)
         
-        tab1, tab2, tab3 = st.tabs(["Главная", "Мои клиенты", "Рейтинг"])
+        tab1, tab2, tab_payouts, tab3 = st.tabs(["Главная", "Мои клиенты", "Выплаты", "Рейтинг"])
         
         with tab1:
             draw_main_dashboard(data)
@@ -912,6 +912,171 @@ def main():
                     st.info("Нет клиентов с выбранными фильтрами в этом месяце.")
             else:
                 st.info("Нет клиентов в Chargebee.")
+
+        with tab_payouts:
+            st.header("История выплат")
+
+            # Month selector for payouts
+            today = date.today()
+            payout_months = []
+            for i in range(12):
+                d = today - relativedelta(months=i)
+                payout_months.append(date(d.year, d.month, 1))
+
+            payout_month_labels = {d: d.strftime("%B %Y") for d in payout_months}
+            selected_payout_month = st.selectbox(
+                "Выберите месяц для просмотра выплат",
+                options=payout_months,
+                format_func=lambda d: payout_month_labels[d],
+                index=0,
+                key="payout_month_selector"
+            )
+
+            # Calculate selected month boundaries
+            payout_end_month = selected_payout_month + relativedelta(months=1)
+
+            # Fetch paid invoices for this partner
+            first_name = data['first_name']
+            client_bq = get_bq_client()
+
+            query_payouts = f"""
+            WITH latest_custs AS (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+                FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+            ),
+            deduped_custs AS (
+                SELECT * 
+                FROM latest_custs
+                WHERE rn = 1
+            ),
+            first_activations AS (
+                SELECT 
+                    customer_id, 
+                    MIN(activated_at) as first_activated_at
+                FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+                WHERE activated_at IS NOT NULL
+                GROUP BY customer_id
+            ),
+            invoices_deduped AS (
+                SELECT * FROM (
+                    SELECT i.*, ROW_NUMBER() OVER(PARTITION BY i.invoice_id ORDER BY i.loaded_at DESC) AS rn
+                    FROM `br-clients-02.ms_ekeppe.chargebee_invoices` i
+                )
+                WHERE rn = 1
+            )
+            SELECT DISTINCT
+                i.invoice_id,
+                c.company as client_name,
+                c.cf_loginprefix as login,
+                i.subscription_id,
+                (CASE i.currency_code
+                    WHEN 'USD' THEN i.amount_paid * {USD_RATE}
+                    WHEN 'KZT' THEN i.amount_paid * 27
+                    WHEN 'KGS' THEN i.amount_paid * 145
+                    WHEN 'TJS' THEN i.amount_paid * 1100
+                    ELSE i.amount_paid
+                END) / 100 as amount_paid,
+                DATE(i.date) as invoice_date,
+                c.cf_sales_manager as sales_manager,
+                c.cf_support_manager as support_manager,
+                COALESCE(DATE(fa.first_activated_at), DATE(c.created_at)) as created_date
+            FROM invoices_deduped i
+            JOIN deduped_custs c ON i.customer_id = c.customer_id
+            LEFT JOIN first_activations fa ON c.customer_id = fa.customer_id
+            WHERE i.status = 'paid'
+              AND DATE(i.date) >= '{selected_payout_month}'
+              AND DATE(i.date) < '{payout_end_month}'
+              AND LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
+            ORDER BY invoice_date DESC
+            """
+
+            payouts_df = client_bq.query(query_payouts).to_dataframe()
+
+            if not payouts_df.empty:
+                # Group by unique login/customer to calculate active count for portfolio tier
+                unique_active_clients = len(payouts_df['login'].unique())
+
+                # Determine Portfolio Bonus Pct
+                portfolio_pct_tier = 0
+                if unique_active_clients >= 150:
+                    portfolio_pct_tier = 20
+                elif unique_active_clients >= 100:
+                    portfolio_pct_tier = 15
+                elif unique_active_clients >= 50:
+                    portfolio_pct_tier = 10
+
+                # Calculate historical metrics
+                def calc_historical_metrics(row):
+                    created = row['created_date']
+                    invoice_date = row['invoice_date']
+                    amount_paid = row['amount_paid']
+
+                    is_revshare_period = pd.notna(created) and pd.notna(invoice_date) and (invoice_date - created).days <= 365
+
+                    # A. Sales Revshare Bonus (only in first 12 months)
+                    if is_revshare_period:
+                        sales = str(row['sales_manager']).lower() if pd.notna(row['sales_manager']) else ''
+                        support = str(row['support_manager']).lower() if pd.notna(row['support_manager']) else ''
+                        partner_lower = partner_name.lower()
+                        sales_match = partner_lower.split()[0].lower() in sales
+                        support_match = partner_lower.split()[0].lower() in support
+                        if sales_match and support_match:
+                            bonus_pct = 50
+                        elif support_match:
+                            bonus_pct = 20
+                        else:
+                            bonus_pct = 0
+                    else:
+                        bonus_pct = 0
+
+                    bonus_amount = int(amount_paid * bonus_pct / 100)
+
+                    # B. Portfolio Bonus (only starting from 13th month)
+                    if not is_revshare_period:
+                        portfolio_pct = portfolio_pct_tier
+                    else:
+                        portfolio_pct = 0
+
+                    portfolio_amount = int(amount_paid * portfolio_pct / 100)
+                    total_bonus = bonus_amount + portfolio_amount
+
+                    return pd.Series([bonus_pct, bonus_amount, portfolio_pct, portfolio_amount, total_bonus])
+
+                payouts_df[['bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus']] = payouts_df.apply(calc_historical_metrics, axis=1)
+
+                # Metrics
+                total_paid_mrr = int(payouts_df['amount_paid'].sum())
+                total_historical_sales_bonus = int(payouts_df['bonus_amount'].sum())
+                total_historical_portfolio_bonus = int(payouts_df['portfolio_amount'].sum())
+                total_historical_all_bonus = int(payouts_df['total_bonus'].sum())
+
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.metric("Оплаченные клиенты", unique_active_clients, f"Ставка портфеля: {portfolio_pct_tier}%")
+                with c2:
+                    st.metric("Оплаченный MRR (UZS)", f"{total_paid_mrr:,}".replace(",", " "))
+                with c3:
+                    st.metric("Бонус с продаж (UZS)", f"{total_historical_sales_bonus:,}".replace(",", " "))
+                with c4:
+                    st.metric("Портфельн. доход (UZS)", f"{total_historical_portfolio_bonus:,}".replace(",", " "))
+
+                st.write("---")
+                st.markdown(f"#### Выплаченный бонус за месяц: <span style='color:#16a34a;'>{total_historical_all_bonus:,} UZS</span>".replace(",", " "), unsafe_allow_html=True)
+                st.write("---")
+
+                # Table display
+                display_payouts = payouts_df[['client_name', 'login', 'amount_paid', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'invoice_date', 'created_date']].copy()
+                display_payouts.columns = ["Клиент", "Логин", "Оплачено (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата счета", "Дата активации"]
+
+                for col in ["Оплачено (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
+                    display_payouts[col] = display_payouts[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
+
+                display_payouts["Бонус продаж %"] = display_payouts["Бонус продаж %"].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "—")
+                display_payouts["Портфель %"] = display_payouts["Портфель %"].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "—")
+
+                st.dataframe(display_payouts, use_container_width=True, hide_index=True)
+            else:
+                st.info("Нет оплаченных счетов за выбранный месяц.")
 
 if __name__ == "__main__":
     main()
