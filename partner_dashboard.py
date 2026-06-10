@@ -834,6 +834,22 @@ def main():
                 total_portfolio_bonus = int(my_clients_df['portfolio_amount'].sum())
                 total_all_bonus = int(my_clients_df['total_bonus'].sum())
                 
+                # Filter by status if selected
+                status_filter_map = {
+                    "Активен": "active",
+                    "В триале": "in_trial",
+                    "Отменен": "cancelled",
+                    "Не продлевается": "non_renewing"
+                }
+                filtered_df = my_clients_df.copy()
+                if selected_status != "Все":
+                    target_status = status_filter_map[selected_status]
+                    filtered_df = filtered_df[filtered_df['status'] == target_status]
+                
+                # Filter by activity if selected
+                if selected_activity != "Все":
+                    filtered_df = filtered_df[filtered_df['Активность'] == selected_activity]
+
                 col_left, col_right = st.columns([2, 1])
                 with col_left:
                     c1, c2 = st.columns(2)
@@ -853,7 +869,7 @@ def main():
                 
                 with col_right:
                     st.markdown("<h4 style='font-size:16px; margin-bottom: 5px; text-align: center;'>Активность клиентов</h4>", unsafe_allow_html=True)
-                    activity_counts = my_clients_df[my_clients_df['Активность'] != 'Нет данных']['Активность'].value_counts().reset_index()
+                    activity_counts = filtered_df[filtered_df['Активность'] != 'Нет данных']['Активность'].value_counts().reset_index()
                     activity_counts.columns = ['Активность', 'Количество']
                     if not activity_counts.empty:
                         fig = px.pie(activity_counts, names='Активность', values='Количество', 
@@ -875,22 +891,6 @@ def main():
                         st.info("Нет данных об активности")
                 
                 st.write("---")
-                
-                # Filter by status if selected
-                status_filter_map = {
-                    "Активен": "active",
-                    "В триале": "in_trial",
-                    "Отменен": "cancelled",
-                    "Не продлевается": "non_renewing"
-                }
-                filtered_df = my_clients_df.copy()
-                if selected_status != "Все":
-                    target_status = status_filter_map[selected_status]
-                    filtered_df = filtered_df[filtered_df['status'] == target_status]
-                
-                # Filter by activity if selected
-                if selected_activity != "Все":
-                    filtered_df = filtered_df[filtered_df['Активность'] == selected_activity]
 
                 if not filtered_df.empty:
                     display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'Активность', 'mrr', 'debt', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
