@@ -23,7 +23,9 @@ def check_password():
             "2222": "Naim Shokirov",
             "3333": "Asilbek Akbaraliev",
             "4444": "Bobur Abdukakhkharov",
-            "5555": "Xikmatillo Baxtiyorov"
+            "5555": "Xikmatillo Baxtiyorov",
+            "6666": "Saliq Bysenov",
+            "8888": "Sardor Ibraximov"
         }
         pin = st.session_state["password"]
         if pin in partner_pins:
@@ -190,13 +192,20 @@ def draw_main_dashboard(data):
             monthly_df['month'] = monthly_df['month'].apply(
                 lambda x: f"{month_names[x[5:]]} {x[:4]}"
             )
-            month_order = monthly_df.sort_values('sort_key')['month'].tolist()
+            # Sort chronologically to compute cumulative sum correctly
+            monthly_df = monthly_df.sort_values('sort_key').reset_index(drop=True)
+            monthly_df['cumulative_connections'] = monthly_df['connections'].cumsum()
+            month_order = monthly_df['month'].tolist()
             
             import altair as alt
-            chart = alt.Chart(monthly_df).mark_line(point=True).encode(
+            chart = alt.Chart(monthly_df).mark_bar(color='#2563EB').encode(
                 x=alt.X('month:N', sort=month_order, title='Месяц'),
-                y=alt.Y('connections:Q', title='Подключения'),
-                tooltip=['month', 'connections']
+                y=alt.Y('cumulative_connections:Q', title='Подключения (накопительно)'),
+                tooltip=[
+                    alt.Tooltip('month:N', title='Месяц'),
+                    alt.Tooltip('connections:Q', title='Новых за месяц'),
+                    alt.Tooltip('cumulative_connections:Q', title='Всего (кумулятивно)')
+                ]
             ).properties(height=350)
             st.altair_chart(chart, use_container_width=True)
         else:
