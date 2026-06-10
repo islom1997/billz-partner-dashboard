@@ -12,6 +12,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+USD_RATE = 12800
+
 # --- AUTHENTICATION ---
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -708,19 +710,44 @@ def main():
                 SELECT * 
                 FROM latest_subs
                 WHERE rn = 1
+            ),
+            invoices_deduped AS (
+                SELECT * FROM (
+                    SELECT i.*, ROW_NUMBER() OVER(PARTITION BY i.invoice_id ORDER BY i.loaded_at DESC) AS rn
+                    FROM `br-clients-02.ms_ekeppe.chargebee_invoices` i
+                )
+                WHERE rn = 1
+            ),
+            debt_summary AS (
+                SELECT
+                    c.customer_id,
+                    SUM(
+                        CASE i.currency_code
+                            WHEN 'USD' THEN i.amount_due * {USD_RATE}
+                            WHEN 'KZT' THEN i.amount_due * 27
+                            WHEN 'KGS' THEN i.amount_due * 145
+                            WHEN 'TJS' THEN i.amount_due * 1100
+                            ELSE i.amount_due
+                        END
+                    ) / 100 AS total_debt
+                FROM invoices_deduped i
+                JOIN deduped_custs c ON i.customer_id = c.customer_id
+                WHERE i.status IN ('payment_due', 'not_paid')
+                GROUP BY c.customer_id
             )
             SELECT DISTINCT
                 c.company as client_name,
                 c.cf_loginprefix as login,
                 sub.plan_id,
                 sub.mrr / 100 as mrr,
+                COALESCE(d.total_debt, 0) as debt,
                 sub.status as status,
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
                 DATE(c.created_at) as created_date
             FROM deduped_custs c
-            JOIN deduped_subs sub
-                ON c.customer_id = sub.customer_id
+            JOIN deduped_subs sub ON c.customer_id = sub.customer_id
+            LEFT JOIN debt_summary d ON c.customer_id = d.customer_id
             WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
             ORDER BY created_date DESC
             """
@@ -837,7 +864,7 @@ def main():
                     filtered_df = filtered_df[filtered_df['Активность'] == selected_activity]
 
                 if not filtered_df.empty:
-                    display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'Активность', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
+                    display_clients = filtered_df[['client_name', 'login', 'plan_id', 'status', 'Активность', 'mrr', 'debt', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
                     status_map = {
                         "active": "Активен",
                         "in_trial": "В триале",
@@ -846,9 +873,9 @@ def main():
                         "future": "Будущий"
                     }
                     display_clients["status"] = display_clients["status"].map(status_map).fillna(display_clients["status"])
-                    display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "Активность", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
+                    display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "Активность", "MRR (UZS)", "Долг клиента (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
                     
-                    for col in ["MRR (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
+                    for col in ["MRR (UZS)", "Долг клиента (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
                         display_clients[col] = display_clients[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
                     
                     display_clients["Бонус продаж %"] = display_clients["Бонус продаж %"].apply(lambda x: f"{int(x)}%" if pd.notna(x) else "—")
