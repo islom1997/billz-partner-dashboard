@@ -77,31 +77,66 @@ def get_partner_data(partner_name):
     # Use first name for matching cf_support_manager (format varies: "Parviz Khafizov Partner", etc.)
     first_name = partner_name.split()[0]
     
-    # 1. All-time active connections (directly from Chargebee)
     query_conn_all = f"""
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status = 'active'
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
+    )
     SELECT 
         COUNT(DISTINCT sub.customer_id) as connections_total
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    FROM deduped_custs c
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
     WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
-      AND sub.status = 'active'
     """
     conn_all_df = client.query(query_conn_all).to_dataframe()
     
     # 2. New Chargebee customers THIS MONTH
     query_new = f"""
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status = 'active'
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
+    )
     SELECT DISTINCT
         c.company as client_name,
         c.cf_loginprefix as login,
         sub.plan_id,
         sub.mrr / 100 as mrr,
         DATE(c.created_at) as created_date
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    FROM deduped_custs c
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
     WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
-      AND sub.status = 'active'
       AND c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
     ORDER BY created_date DESC
     """
@@ -168,10 +203,23 @@ def draw_main_dashboard(data):
     client = get_bq_client()
     safe_name = first_name.replace("'", "\\'")
     query_monthly = f"""
-    WITH deduped_subs AS (
-        SELECT DISTINCT subscription_id, customer_id, status, created_at, cancelled_at
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
         FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
-        WHERE status IN ('active', 'in_trial', 'cancelled')
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
     ),
     months AS (
         SELECT DISTINCT FORMAT_TIMESTAMP('%Y-%m', created_at) as month
@@ -181,7 +229,7 @@ def draw_main_dashboard(data):
         SELECT 
             FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
             COUNT(DISTINCT c.customer_id) as created_count
-        FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+        FROM deduped_custs c
         JOIN deduped_subs sub ON c.customer_id = sub.customer_id
         WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
         GROUP BY month
@@ -190,7 +238,7 @@ def draw_main_dashboard(data):
         SELECT 
             FORMAT_TIMESTAMP('%Y-%m', sub.cancelled_at) as month,
             COUNT(DISTINCT c.customer_id) as churned_count
-        FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
+        FROM deduped_custs c
         JOIN deduped_subs sub ON c.customer_id = sub.customer_id
         WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
           AND sub.status = 'cancelled'
@@ -202,10 +250,10 @@ def draw_main_dashboard(data):
             m.month,
             COUNT(DISTINCT c.customer_id) as active_base
         FROM months m
-        JOIN `br-clients-02.ms_ekeppe.chargebee_customers` c ON LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
+        JOIN deduped_custs c ON LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
         JOIN deduped_subs sub ON c.customer_id = sub.customer_id
         WHERE DATE(sub.created_at) <= LAST_DAY(PARSE_DATE('%Y-%m', m.month))
-          AND (sub.cancelled_at IS NULL OR DATE(sub.cancelled_at) > LAST_DAY(PARSE_DATE('%Y-%m', m.month)))
+          AND (sub.status != 'cancelled' OR DATE(sub.cancelled_at) > LAST_DAY(PARSE_DATE('%Y-%m', m.month)))
         GROUP BY month
     )
     SELECT 
@@ -337,17 +385,35 @@ def draw_leaderboard(data):
     
     client = get_bq_client()
     query_leaderboard = """
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status IN ('active', 'in_trial')
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
+    )
     SELECT 
         c.cf_support_manager as partner,
         COUNT(DISTINCT c.customer_id) as total_clients,
         SUM(sub.mrr) / 100 as total_mrr,
         COUNT(DISTINCT CASE WHEN c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH) 
               THEN c.customer_id END) as new_this_month
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    FROM deduped_custs c
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
-    WHERE sub.status IN ('active', 'in_trial')
-      AND c.cf_support_manager IS NOT NULL
+    WHERE c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
       AND LOWER(c.cf_support_manager) LIKE '%partner%'
     GROUP BY c.cf_support_manager
@@ -402,12 +468,30 @@ def draw_admin_dashboard():
     
     # 2. Partners with sales THIS month (new Chargebee clients)
     query_active_partners = """
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status = 'active'
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
+    )
     SELECT c.cf_support_manager as partner, COUNT(DISTINCT c.customer_id) as sales_count
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    FROM deduped_custs c
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
-    WHERE sub.status = 'active'
-      AND c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+    WHERE c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
       AND c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
       AND LOWER(c.cf_support_manager) LIKE '%partner%'
@@ -434,14 +518,32 @@ def draw_admin_dashboard():
     
     # 4. Average connections per partner
     query_avg_connections = """
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * 
+        FROM latest_custs
+        WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status = 'active'
+    ),
+    deduped_subs AS (
+        SELECT * 
+        FROM latest_subs
+        WHERE rn = 1
+    )
     SELECT 
         c.cf_support_manager as partner,
         COUNT(DISTINCT sub.customer_id) as connections
-    FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    FROM deduped_custs c
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
-    WHERE sub.status = 'active'
-      AND c.cf_support_manager IS NOT NULL
+    WHERE c.cf_support_manager IS NOT NULL
       AND c.cf_support_manager != ''
       AND LOWER(c.cf_support_manager) LIKE '%partner%'
     GROUP BY c.cf_support_manager
@@ -554,6 +656,25 @@ def main():
             first_name = data['first_name']
             client_bq = get_bq_client()
             query_my_clients = f"""
+            WITH latest_custs AS (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+                FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+            ),
+            deduped_custs AS (
+                SELECT * 
+                FROM latest_custs
+                WHERE rn = 1
+            ),
+            latest_subs AS (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+                FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+                WHERE status IN ('active', 'in_trial')
+            ),
+            deduped_subs AS (
+                SELECT * 
+                FROM latest_subs
+                WHERE rn = 1
+            )
             SELECT DISTINCT
                 c.company as client_name,
                 c.cf_loginprefix as login,
@@ -562,11 +683,10 @@ def main():
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
                 DATE(c.created_at) as created_date
-            FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-            JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+            FROM deduped_custs c
+            JOIN deduped_subs sub
                 ON c.customer_id = sub.customer_id
             WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
-              AND sub.status IN ('active', 'in_trial')
             ORDER BY created_date DESC
             """
             my_clients_df = client_bq.query(query_my_clients).to_dataframe()
