@@ -168,21 +168,33 @@ def draw_main_dashboard(data):
     client = get_bq_client()
     safe_name = first_name.replace("'", "\\'")
     query_monthly = f"""
-    SELECT 
+    WITH deduped_subs AS (
+        SELECT DISTINCT subscription_id, customer_id, status
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+        WHERE status IN ('active', 'in_trial', 'cancelled')
+    )
+    SELECT
         FORMAT_TIMESTAMP('%Y-%m', c.created_at) as month,
+        CASE WHEN sub.status IN ('active', 'in_trial') THEN 'Активные' ELSE 'Отток' END as status,
         COUNT(DISTINCT c.customer_id) as connections
     FROM `br-clients-02.ms_ekeppe.chargebee_customers` c
-    JOIN `br-clients-02.ms_ekeppe.chargebee_subscriptions` sub
+    JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
     WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{safe_name}%')
-      AND sub.status IN ('active', 'in_trial')
       AND DATE(c.created_at) >= DATE_SUB(DATE_TRUNC(CURRENT_DATE(), MONTH), INTERVAL 12 MONTH)
-    GROUP BY month
-    ORDER BY month
+    GROUP BY month, status
+    ORDER BY month, status
     """
     try:
         monthly_df = client.query(query_monthly).to_dataframe()
         if not monthly_df.empty:
+            # Fill missing status combinations with 0 to ensure cumulative sum doesn't skip months
+            all_months = monthly_df['month'].unique()
+            all_statuses = ['Активные', 'Отток']
+            grid = pd.MultiIndex.from_product([all_months, all_statuses], names=['month', 'status']).to_frame().reset_index(drop=True)
+            monthly_df = pd.merge(grid, monthly_df, on=['month', 'status'], how='left')
+            monthly_df['connections'] = monthly_df['connections'].fillna(0).astype(int)
+
             month_names = {
                 '01': 'Янв', '02': 'Фев', '03': 'Мар', '04': 'Апр',
                 '05': 'Май', '06': 'Июн', '07': 'Июл', '08': 'Авг',
@@ -193,16 +205,21 @@ def draw_main_dashboard(data):
                 lambda x: f"{month_names[x[5:]]} {x[:4]}"
             )
             # Sort chronologically to compute cumulative sum correctly
-            monthly_df = monthly_df.sort_values('sort_key').reset_index(drop=True)
-            monthly_df['cumulative_connections'] = monthly_df['connections'].cumsum()
-            month_order = monthly_df['month'].tolist()
+            monthly_df = monthly_df.sort_values(['sort_key', 'status']).reset_index(drop=True)
+            monthly_df['cumulative_connections'] = monthly_df.groupby('status')['connections'].cumsum()
+            month_order = monthly_df.sort_values('sort_key')['month'].unique().tolist()
             
             import altair as alt
-            chart = alt.Chart(monthly_df).mark_bar(color='#2563EB').encode(
+            chart = alt.Chart(monthly_df).mark_bar().encode(
                 x=alt.X('month:N', sort=month_order, title='Месяц'),
                 y=alt.Y('cumulative_connections:Q', title='Подключения (накопительно)'),
+                color=alt.Color('status:N', title='Статус', scale=alt.Scale(
+                    domain=['Активные', 'Отток'],
+                    range=['#2563EB', '#EF4444']
+                )),
                 tooltip=[
                     alt.Tooltip('month:N', title='Месяц'),
+                    alt.Tooltip('status:N', title='Статус'),
                     alt.Tooltip('connections:Q', title='Новых за месяц'),
                     alt.Tooltip('cumulative_connections:Q', title='Всего (кумулятивно)')
                 ]
