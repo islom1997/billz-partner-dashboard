@@ -680,6 +680,7 @@ def main():
                 c.cf_loginprefix as login,
                 sub.plan_id,
                 sub.mrr / 100 as mrr,
+                sub.status as status,
                 c.cf_sales_manager as sales_manager,
                 c.cf_support_manager as support_manager,
                 DATE(c.created_at) as created_date
@@ -753,8 +754,16 @@ def main():
                 st.markdown(f"#### Итого бонус за месяц: <span style='color:#16a34a;'>{total_all_bonus:,} UZS</span>".replace(",", " "), unsafe_allow_html=True)
                 st.write("---")
                 
-                display_clients = my_clients_df[['client_name', 'login', 'plan_id', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
-                display_clients.columns = ["Клиент", "Логин", "Тариф", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
+                display_clients = my_clients_df[['client_name', 'login', 'plan_id', 'status', 'mrr', 'bonus_pct', 'bonus_amount', 'portfolio_pct', 'portfolio_amount', 'total_bonus', 'created_date']].copy()
+                status_map = {
+                    "active": "Активен",
+                    "in_trial": "В триале",
+                    "cancelled": "Отменен",
+                    "non_renewing": "Не продлевается",
+                    "future": "Будущий"
+                }
+                display_clients["status"] = display_clients["status"].map(status_map).fillna(display_clients["status"])
+                display_clients.columns = ["Клиент", "Логин", "Тариф", "Статус в CB", "MRR (UZS)", "Бонус продаж %", "Бонус продаж (UZS)", "Портфель %", "Портфель (UZS)", "Итого бонус (UZS)", "Дата создания"]
                 
                 for col in ["MRR (UZS)", "Бонус продаж (UZS)", "Портфель (UZS)", "Итого бонус (UZS)"]:
                     display_clients[col] = display_clients[col].apply(lambda x: f"{int(x):,}".replace(",", " ") if pd.notna(x) else "—")
