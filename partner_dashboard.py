@@ -29,7 +29,8 @@ def check_password():
             "4444": "Bobur Abdukakhkharov",
             "5555": "Xikmatillo Baxtiyorov",
             "6666": "Saliq Bysenov",
-            "8888": "Sardor Ibraximov"
+            "8888": "Sardor Ibraximov",
+            "1112": "Sarvar Alimov"
         }
         pin = st.session_state["password"]
         if pin in partner_pins:
@@ -984,6 +985,7 @@ def main():
             JOIN deduped_custs c ON i.customer_id = c.customer_id
             LEFT JOIN first_activations fa ON c.customer_id = fa.customer_id
             WHERE i.status = 'paid'
+              AND i.recurring = true
               AND DATE(i.date, 'Asia/Tashkent') >= '{selected_payout_month}'
               AND DATE(i.date, 'Asia/Tashkent') < '{payout_end_month}'
               AND LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
