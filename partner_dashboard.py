@@ -99,7 +99,10 @@ def get_partner_data(partner_name):
         
     client = get_bq_client()
     # Use first name for matching cf_support_manager (format varies: "Parviz Khafizov Partner", etc.)
-    first_name = partner_name.split()[0]
+    if "saliq" in partner_name.lower():
+        first_name = "Texnopos"
+    else:
+        first_name = partner_name.split()[0]
     
     query_conn_all = f"""
     WITH latest_custs AS (
@@ -799,9 +802,8 @@ def main():
                     
                     sales = str(row['sales_manager']).lower() if pd.notna(row['sales_manager']) else ''
                     support = str(row['support_manager']).lower() if pd.notna(row['support_manager']) else ''
-                    partner_lower = partner_name.lower()
-                    sales_match = partner_lower.split()[0].lower() in sales
-                    support_match = partner_lower.split()[0].lower() in support
+                    sales_match = first_name.lower() in sales
+                    support_match = first_name.lower() in support
                     if sales_match and support_match:
                         return 50
                     elif support_match:
@@ -1019,9 +1021,8 @@ def main():
                     if is_revshare_period:
                         sales = str(row['sales_manager']).lower() if pd.notna(row['sales_manager']) else ''
                         support = str(row['support_manager']).lower() if pd.notna(row['support_manager']) else ''
-                        partner_lower = partner_name.lower()
-                        sales_match = partner_lower.split()[0].lower() in sales
-                        support_match = partner_lower.split()[0].lower() in support
+                        sales_match = first_name.lower() in sales
+                        support_match = first_name.lower() in support
                         if sales_match and support_match:
                             bonus_pct = 50
                         elif support_match:
