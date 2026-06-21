@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import math
 from google.cloud import bigquery
 import numpy as np
 import plotly.express as px
@@ -14,6 +15,118 @@ st.set_page_config(
 )
 
 USD_RATE = 12800
+
+# --- PARTNER GRADE SYSTEM ---
+# Грейд определяется по минимальным требованиям. Партнёр получает самый высокий
+# уровень, для которого ОДНОВРЕМЕННО выполнены все условия: Active clients,
+# Partner MRR и (начиная с Level 4) Retention за последние 6 месяцев.
+GRADES = [
+    {
+        "level": 1, "title": "Starter", "name": "Starter Partner",
+        "min_clients": 1, "min_mrr": 299_000, "min_retention": None,
+        "benefits": [
+            "Доступ к партнёрскому дашборду с аналитикой по клиентам и MRR",
+            "5 SQL-лидов",
+            "Онбординг-курс: видеоуроки по продукту и финальный тест",
+            "Чат поддержки партнёров",
+            "Базовый набор sales-материалов: презентация, FAQ, скрипт продаж",
+        ],
+    },
+    {
+        "level": 2, "title": "Certified", "name": "Certified Partner",
+        "min_clients": 15, "min_mrr": 7_000_000, "min_retention": None,
+        "benefits": [
+            "Размещение на сайте BILLZ: карточка с логотипом, описанием и контактами",
+            "5 SQL + 2 HQL лида в месяц",
+            "Бейдж Certified Partner для сайта, визиток и соцсетей",
+            "Индивидуальные вебинары от Sales-команды 2 раза в месяц",
+        ],
+    },
+    {
+        "level": 3, "title": "Growth", "name": "Growth Partner",
+        "min_clients": 40, "min_mrr": 20_000_000, "min_retention": None,
+        "benefits": [
+            "Повышенный приоритет в перераспределении лидов",
+            "Продажа доп. продуктов: TBC Счёт, Payme Go, Payme QR",
+            "4 персональных тренинг-сессии в квартал с Sales Manager BILLZ",
+            "Разбор воронки продаж с TeamLead of Sales",
+        ],
+    },
+    {
+        "level": 4, "title": "Strategic", "name": "Strategic Partner",
+        "min_clients": 80, "min_mrr": 40_000_000, "min_retention": 85,
+        "benefits": [
+            "Приоритет в распределении лидов: первый в регионе",
+            "Размещение в Instagram BILLZ",
+            "Квартальные бонусы за выполнение плана",
+            "Расширенная поддержка со стороны Sales-команды BILLZ",
+        ],
+    },
+    {
+        "level": 5, "title": "Elite", "name": "Elite Partner",
+        "min_clients": 200, "min_mrr": 100_000_000, "min_retention": 90,
+        "benefits": [
+            "Максимальный приоритет в распределении лидов",
+            "Приоритет первого партнёра в регионе",
+            "Расширенный co-branded marketing с BILLZ",
+            "Размещение на сайте и в Instagram BILLZ как топ-партнёр",
+            "Номинация на статус «Партнёр года»",
+        ],
+    },
+]
+
+
+def _grade_met(grade, active_clients, partner_mrr, retention_pct):
+    """True, если по грейду выполнены ВСЕ требования одновременно."""
+    if active_clients < grade["min_clients"]:
+        return False
+    if partner_mrr < grade["min_mrr"]:
+        return False
+    if grade["min_retention"] is not None:
+        if retention_pct is None or retention_pct < grade["min_retention"]:
+            return False
+    return True
+
+
+def compute_grade(active_clients, partner_mrr, retention_pct):
+    """Возвращает (current_grade, next_grade).
+
+    current_grade — самый высокий уровень, где выполнены все условия
+    (None, если не достигнут даже Level 1). next_grade — следующий уровень
+    (None, если достигнут максимальный).
+    """
+    current = None
+    for g in GRADES:
+        if _grade_met(g, active_clients, partner_mrr, retention_pct):
+            current = g
+    current_level = current["level"] if current else 0
+    next_grade = next((g for g in GRADES if g["level"] == current_level + 1), None)
+    return current, next_grade
+
+
+def fmt_uzs(n):
+    """1234567 -> '1 234 567'. Безопасно для None/NaN."""
+    try:
+        if n is None or (isinstance(n, float) and math.isnan(n)):
+            return "—"
+        return f"{int(round(n)):,}".replace(",", " ")
+    except (ValueError, TypeError):
+        return "—"
+
+
+def retention_status(retention_pct, required):
+    """(текст, цвет) статуса retention относительно требуемого порога."""
+    if required is None:
+        return "не требуется для следующего уровня", "#94a3b8"
+    if retention_pct is None:
+        return "нет данных", "#94a3b8"
+    if retention_pct >= required:
+        return "выполнено", "#16a34a"
+    gap = required - retention_pct
+    if gap <= 5:
+        return f"не хватает {gap:.0f} п.п.", "#f59e0b"
+    return "ниже порога", "#dc2626"
+
 
 # --- AUTHENTICATION ---
 def check_password():
@@ -124,8 +237,9 @@ def get_partner_data(partner_name):
         WHERE rn = 1
           AND status = 'active'
     )
-    SELECT 
-        COUNT(DISTINCT sub.customer_id) as connections_total
+    SELECT
+        COUNT(DISTINCT sub.customer_id) as connections_total,
+        COALESCE(SUM(sub.mrr), 0) / 100 as partner_mrr
     FROM deduped_custs c
     JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
@@ -178,50 +292,261 @@ def get_partner_data(partner_name):
     WHERE menedzher = '{partner_name}' 
     """
     deals_df = client.query(query_deals).to_dataframe()
-    
+
+    # 4. Retention за последние 6 месяцев (логотип-ретеншн по активным клиентам):
+    #    из клиентов, активных 6 месяцев назад, какая доля активна сейчас.
+    query_retention = f"""
+    WITH latest_custs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_customers`
+    ),
+    deduped_custs AS (
+        SELECT * FROM latest_custs WHERE rn = 1
+    ),
+    latest_subs AS (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY subscription_id ORDER BY loaded_at DESC) as rn
+        FROM `br-clients-02.ms_ekeppe.chargebee_subscriptions`
+    ),
+    deduped_subs AS (
+        SELECT * FROM latest_subs WHERE rn = 1
+    ),
+    per_customer AS (
+        SELECT
+            c.customer_id,
+            LOGICAL_OR(
+                DATE(sub.created_at) <= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+                AND (sub.cancelled_at IS NULL OR DATE(sub.cancelled_at) > DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH))
+            ) AS active_6mo_ago,
+            LOGICAL_OR(sub.status = 'active') AS active_now
+        FROM deduped_custs c
+        JOIN deduped_subs sub ON c.customer_id = sub.customer_id
+        WHERE LOWER(c.cf_support_manager) LIKE LOWER('%{first_name}%')
+        GROUP BY c.customer_id
+    )
+    SELECT
+        COUNTIF(active_6mo_ago) AS base_count,
+        COUNTIF(active_6mo_ago AND active_now) AS retained_count
+    FROM per_customer
+    """
+    try:
+        ret_df = client.query(query_retention).to_dataframe()
+        base_count = int(ret_df['base_count'].iloc[0]) if not ret_df.empty else 0
+        retained_count = int(ret_df['retained_count'].iloc[0]) if not ret_df.empty else 0
+    except Exception:
+        base_count, retained_count = 0, 0
+    retention_pct = round(retained_count / base_count * 100, 1) if base_count > 0 else None
+
     # Values
     connections = int(conn_all_df['connections_total'].iloc[0]) if not conn_all_df.empty and pd.notna(conn_all_df['connections_total'].iloc[0]) else 0
+    partner_mrr = float(conn_all_df['partner_mrr'].iloc[0]) if not conn_all_df.empty and pd.notna(conn_all_df['partner_mrr'].iloc[0]) else 0.0
     connections_month = len(success_df)
-    
-    # Scoring (from index.html logic)
-    points_connections = connections * 50
-    total_points = points_connections
-    
-    level = 1
-    level_title = "Новичок"
-    if total_points >= 1200:
-        level, level_title = 5, "Легенда"
-    elif total_points >= 700:
-        level, level_title = 4, "Мастер"
-    elif total_points >= 350:
-        level, level_title = 3, "Профи"
-    elif total_points >= 120:
-        level, level_title = 2, "Боец"
+
+    # Grade: самый высокий уровень, где ОДНОВРЕМЕННО выполнены все требования
+    current_grade, next_grade = compute_grade(connections, partner_mrr, retention_pct)
+    level = current_grade["level"] if current_grade else 0
+    level_title = current_grade["title"] if current_grade else "Без грейда"
 
     return {
         "name": partner_name,
         "first_name": first_name,
         "level": level,
         "level_title": level_title,
-        "total_points": total_points,
         "connections": connections,
+        "partner_mrr": partner_mrr,
+        "retention_pct": retention_pct,
+        "retention_base": base_count,
+        "current_grade": current_grade,
+        "next_grade": next_grade,
         "connections_month": connections_month,
         "success_df": success_df
     }
 
+LEVEL_COLORS = {
+    0: "#94a3b8",  # без грейда
+    1: "#64748b",  # Starter
+    2: "#0284c7",  # Certified
+    3: "#4f46e5",  # Growth
+    4: "#d97706",  # Strategic
+    5: "#059669",  # Elite
+}
+
+
+def render_progress_bar(label, current, target, unit=""):
+    """Кастомный прогресс-бар с подписью 'current / target'."""
+    pct = min(100.0, current / target * 100) if target else 100.0
+    done = current >= target
+    bar_color = "#16a34a" if done else "#3b82f6"
+    unit_txt = f" {unit}" if unit else ""
+    check = " ✅" if done else ""
+    st.markdown(
+        f"""
+        <div style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+            <span style="font-weight:600;">{label}{check}</span>
+            <span style="color:#64748b;">{fmt_uzs(current)} / {fmt_uzs(target)}{unit_txt}</span>
+          </div>
+          <div style="background:#e2e8f0; border-radius:8px; height:10px; overflow:hidden;">
+            <div style="width:{pct:.1f}%; background:{bar_color}; height:100%; border-radius:8px;"></div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def draw_grade_section(data):
+    """Грейд-роадмап партнёра: текущий уровень, прогресс, бенефиты, next best action."""
+    active = data["connections"]
+    mrr = data["partner_mrr"]
+    ret = data["retention_pct"]
+    cur = data["current_grade"]
+    nxt = data["next_grade"]
+
+    level = cur["level"] if cur else 0
+    color = LEVEL_COLORS.get(level, "#64748b")
+
+    # --- Заголовок: текущий уровень ---
+    if cur:
+        st.markdown(
+            f"<span style='background:{color}1a; color:{color}; padding:4px 12px; "
+            f"border-radius:14px; font-size:13px; font-weight:700;'>"
+            f"⭐ Level {cur['level']} · {cur['name']}</span>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<span style='background:#f1f5f9; color:#64748b; padding:4px 12px; "
+            "border-radius:14px; font-size:13px; font-weight:700;'>Пока без грейда</span>",
+            unsafe_allow_html=True,
+        )
+        st.caption("Для Level 1 — Starter нужно минимум 1 активный клиент и 299 000 сум Partner MRR.")
+
+    # Разрывы до следующего уровня
+    clients_gap = max(0, nxt["min_clients"] - active) if nxt else 0
+    mrr_gap = max(0, nxt["min_mrr"] - mrr) if nxt else 0
+
+    # --- Текущие метрики (4.1) ---
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        delta = f"до Level {nxt['level']}: +{clients_gap}" if (nxt and clients_gap > 0) else ("✓ выполнено" if nxt else "макс. уровень")
+        st.metric("Active clients", active, delta, delta_color="off")
+    with c2:
+        delta = f"+{fmt_uzs(mrr_gap)} сум" if (nxt and mrr_gap > 0) else ("✓ выполнено" if nxt else "макс. уровень")
+        st.metric("Partner MRR", f"{fmt_uzs(mrr)} сум", delta, delta_color="off")
+    with c3:
+        ret_display = f"{ret:.0f}%" if ret is not None else "нет данных"
+        req_for_status = nxt["min_retention"] if nxt else (cur["min_retention"] if cur else None)
+        status_text, _ = retention_status(ret, req_for_status)
+        st.metric("Retention (6 мес)", ret_display, status_text, delta_color="off")
+
+    st.write("")
+
+    if nxt:
+        # --- Прогресс до следующего уровня (4.2) ---
+        st.markdown(f"##### Прогресс до Level {nxt['level']} — {nxt['name']}")
+        render_progress_bar("Active clients", active, nxt["min_clients"])
+        render_progress_bar("Partner MRR", mrr, nxt["min_mrr"], "сум")
+        status_text, status_color = retention_status(ret, nxt["min_retention"])
+        ret_display = f"{ret:.0f}%" if ret is not None else "нет данных"
+        st.markdown(
+            f"<div style='font-size:13px; margin-top:2px;'><b>Retention:</b> {ret_display} — "
+            f"<span style='color:{status_color}; font-weight:600;'>{status_text}</span></div>",
+            unsafe_allow_html=True,
+        )
+
+        # --- Сколько осталось (4.1, текст под таблицей) ---
+        remaining_parts = []
+        if clients_gap > 0:
+            remaining_parts.append(f"подключить {clients_gap} активных клиентов")
+        if mrr_gap > 0:
+            remaining_parts.append(f"увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум")
+        st.write("")
+        if remaining_parts:
+            st.markdown(f"До **Level {nxt['level']} — {nxt['name']}** осталось: " + " и ".join(remaining_parts) + ".")
+        else:
+            st.success(f"Все требования для Level {nxt['level']} — {nxt['name']} выполнены. Уровень обновится после ближайшего пересчёта.")
+    else:
+        st.success(f"🏆 Достигнут максимальный уровень — {cur['name']}. Поздравляем!")
+
+    # --- Retention health для текущего уровня: grace period (2.1 / 2.2) ---
+    if cur and cur["min_retention"] is not None and ret is not None and ret < cur["min_retention"]:
+        st.warning(
+            f"⚠️ Retention {ret:.0f}% ниже порога вашего уровня ({cur['min_retention']}%). "
+            "Действует grace period 2 месяца на восстановление — уровень и бенефиты пока сохраняются."
+        )
+
+    st.write("---")
+
+    # --- Разблокированные преимущества (4.3) ---
+    col_now, col_next = st.columns(2)
+    with col_now:
+        st.markdown("##### ✅ Доступно сейчас" + (f" — Level {cur['level']}" if cur else ""))
+        if cur:
+            for b in cur["benefits"]:
+                st.markdown(f"- {b}")
+        else:
+            st.caption("Бенефиты станут доступны после достижения Level 1 — Starter.")
+    with col_next:
+        if nxt:
+            st.markdown(f"##### 🔓 Откроется на Level {nxt['level']} — {nxt['name']}")
+            for b in nxt["benefits"]:
+                st.markdown(f"- {b}")
+        else:
+            st.markdown("##### 🔓 Следующий уровень")
+            st.caption("Вы на максимальном уровне — дальше только удержание Elite-статуса.")
+
+    st.write("---")
+
+    # --- Next Best Action (4.4) ---
+    st.markdown("##### 🎯 Что сделать дальше")
+    if nxt:
+        # Главное действие — наибольший относительный разрыв
+        primary_candidates = []
+        if clients_gap > 0:
+            primary_candidates.append((clients_gap / nxt["min_clients"], f"Подключить ещё {clients_gap} активных клиентов"))
+        if mrr_gap > 0:
+            primary_candidates.append((mrr_gap / nxt["min_mrr"], f"Увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум"))
+        if nxt["min_retention"] is not None and ret is not None and ret < nxt["min_retention"]:
+            primary_candidates.append(((nxt["min_retention"] - ret) / nxt["min_retention"], f"Поднять retention до {nxt['min_retention']}%"))
+        if primary_candidates:
+            primary = max(primary_candidates, key=lambda x: x[0])[1]
+            st.info(f"**Главное действие:** {primary} — это ближайший шаг к Level {nxt['level']}.")
+
+        actions = []
+        if clients_gap > 0:
+            actions.append(f"Подключите ещё {clients_gap} активных клиентов, чтобы выполнить требование по клиентам для Level {nxt['level']}.")
+        if mrr_gap > 0:
+            actions.append(f"Увеличьте Partner MRR на {fmt_uzs(mrr_gap)} сум, чтобы выполнить MRR-требование для Level {nxt['level']}.")
+        if nxt["min_retention"] is not None:
+            if ret is None:
+                actions.append(f"Недостаточно данных по retention. Требование для Level {nxt['level']} — {nxt['min_retention']}%.")
+            elif ret >= nxt["min_retention"]:
+                actions.append(f"Retention сейчас {ret:.0f}%. Требование для Level {nxt['level']} — {nxt['min_retention']}%, условие уже выполнено.")
+            else:
+                actions.append(f"Поднимите retention с {ret:.0f}% до {nxt['min_retention']}% — удерживайте текущих клиентов в ближайшие месяцы.")
+        if mrr_gap > 0 and active > 0:
+            avg_mrr = mrr / active
+            if avg_mrr > 0:
+                need_clients = math.ceil(mrr_gap / avg_mrr)
+                actions.append(
+                    f"Средний MRR на клиента сейчас {fmt_uzs(avg_mrr)} сум. Чтобы добрать {fmt_uzs(mrr_gap)} сум MRR, "
+                    f"нужно примерно {need_clients} новых клиентов с таким же средним чеком."
+                )
+        for a in actions:
+            st.markdown(f"- {a}")
+    else:
+        st.info("**Главное действие:** удерживайте retention и активную базу, чтобы сохранить статус Elite.")
+        st.markdown(
+            "- Критерии статуса «Партнёр года»: рост Partner MRR, retention, NPS клиентов, "
+            "выполнение квартальных планов, качество обработки лидов."
+        )
+
+
 def draw_main_dashboard(data):
     st.markdown(f"### Добро пожаловать, {data['name']}!")
-    st.markdown(f"<span style='background:#e0e7ff; color:#4338ca; padding:4px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>⭐ Уровень {data['level']} · {data['level_title']}</span>", unsafe_allow_html=True)
-    
-    st.write("---")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Баллы", f"{data['total_points']}")
-    with col2:
-        st.metric("Подключения (всего)", data['connections'])
-    with col3:
-        st.metric("Новые в этом месяце", data['connections_month'])
+
+    draw_grade_section(data)
+
     st.write("---")
     
     # --- Monthly connections line chart ---
