@@ -118,6 +118,16 @@ def fmt_uzs(n):
         return "—"
 
 
+def plural_ru(n, one, few, many):
+    """Русское склонение слова по числу n: one — для 1, few — для 2–4, many — 5+."""
+    n = abs(int(n))
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14):
+        return few
+    return many
+
+
 def retention_status(retention_pct, required):
     """(текст, цвет) статуса retention относительно требуемого порога."""
     if required is None:
@@ -781,6 +791,44 @@ def draw_main_dashboard(data):
         st.info("В этом месяце пока нет новых клиентов.")
 
 
+def render_rank_goal(new_df, cur_rank, my_new):
+    """Мотивационный блок «До следующего места» над таблицей (Правка 2 ТЗ).
+
+    Данные берутся из того же текущего рейтинга по новым клиентам — новых
+    источников нет. Логика подсчёта позиций не меняется.
+    """
+    n = len(new_df)
+    if cur_rank == 1:
+        accent = "#d97706"  # лидер — золотой акцент
+        if n >= 2:
+            second = int(new_df.iloc[1]['new_this_month'])
+            gap = int(my_new) - second
+            if gap > 0:
+                word = plural_ru(gap, "клиента", "клиента", "клиентов")
+                msg = f"🏆 Вы лидер этого месяца! #2 отстаёт на {gap} {word}."
+            else:
+                msg = ("🏆 Вы лидер этого месяца! #2 идёт вровень — "
+                       "привлеките ещё клиентов, чтобы укрепить отрыв.")
+        else:
+            msg = "🏆 Вы лидер этого месяца! Пока вы единственный участник — так держать!"
+    else:
+        accent = "#3b82f6"  # догоняющий — синий акцент
+        above_rank = cur_rank - 1
+        above = int(new_df.iloc[cur_rank - 2]['new_this_month'])
+        diff = above - int(my_new)
+        if diff > 0:
+            word = plural_ru(diff, "нового клиента", "новых клиентов", "новых клиентов")
+            msg = f"🎯 До #{above_rank} места не хватает {diff} {word}."
+        else:
+            msg = (f"🎯 До #{above_rank} места — столько же клиентов. "
+                   "Привлеки ещё 1, чтобы обогнать.")
+    st.markdown(
+        f"<div style='background:#1e3a5f33; border-left:4px solid {accent}; border-radius:8px;"
+        f" padding:10px 14px; margin:6px 0 14px 0; font-size:14px;'>{msg}</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def draw_leaderboard(data):
     """Draws partner leaderboard in a separate tab."""
     st.header("🏆 Рейтинг партнёров")
@@ -810,8 +858,13 @@ def draw_leaderboard(data):
         c.cf_support_manager as partner,
         COUNT(DISTINCT c.customer_id) as total_clients,
         SUM(sub.mrr) / 100 as total_mrr,
-        COUNT(DISTINCT CASE WHEN c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH) 
-              THEN c.customer_id END) as new_this_month
+        COUNT(DISTINCT CASE WHEN c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+              THEN c.customer_id END) as new_this_month,
+        -- Те же новые клиенты, но за ПРОШЛЫЙ календарный месяц (для тренда позиции)
+        COUNT(DISTINCT CASE
+              WHEN c.created_at >= TIMESTAMP(DATE_SUB(DATE(TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)), INTERVAL 1 MONTH))
+               AND c.created_at < TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+              THEN c.customer_id END) as new_prev_month
     FROM deduped_custs c
     JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
@@ -834,12 +887,40 @@ def draw_leaderboard(data):
     if not new_df.empty:
         new_df.insert(0, 'rank', range(1, len(new_df) + 1))
         
-        my_rank_new = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]['rank'].values
-        if len(my_rank_new) > 0:
-            st.markdown(f"Ваше место: **#{my_rank_new[0]}** из {len(new_df)}")
+        my_rows = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]
+        if not my_rows.empty:
+            cur_rank = int(my_rows['rank'].iloc[0])
+            my_new = int(my_rows['new_this_month'].iloc[0])
+
+            # --- Правка 1: тренд позиции относительно прошлого месяца ---
+            # Тот же рейтинг, но по new_prev_month. Если партнёра не было в
+            # прошлом месяце (первый месяц участия) — стрелку не показываем.
+            prev_df = lb_df[lb_df['new_prev_month'] > 0].sort_values(
+                'new_prev_month', ascending=False).reset_index(drop=True)
+            prev_df.insert(0, 'prev_rank', range(1, len(prev_df) + 1))
+            prev_rows = prev_df[prev_df['partner'].apply(lambda x: partner_first in x.lower())]
+            trend_html = ""
+            if not prev_rows.empty:
+                prev_rank = int(prev_rows['prev_rank'].iloc[0])
+                delta = prev_rank - cur_rank  # >0 — позиция выросла
+                if delta > 0:
+                    trend_html = (f" <span style='color:#16a34a; font-weight:700;'>▲ +{delta}</span>"
+                                  " <span style='color:#94a3b8;'>с прошлого месяца</span>")
+                elif delta < 0:
+                    trend_html = (f" <span style='color:#dc2626; font-weight:700;'>▼ −{abs(delta)}</span>"
+                                  " <span style='color:#94a3b8;'>с прошлого месяца</span>")
+                else:
+                    trend_html = " <span style='color:#94a3b8; font-weight:700;'>→ без изменений</span>"
+            st.markdown(
+                f"Ваше место: **#{cur_rank}** из {len(new_df)}{trend_html}",
+                unsafe_allow_html=True,
+            )
+
+            # --- Правка 2: мотивационный блок «До следующего места» ---
+            render_rank_goal(new_df, cur_rank, my_new)
         else:
             st.markdown("У вас пока нет новых клиентов в этом месяце")
-        
+
         display_new = new_df[['rank', 'partner', 'new_this_month']].copy()
         display_new.columns = ["#", "Партнёр", "Новые клиенты"]
         
