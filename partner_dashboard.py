@@ -829,6 +829,56 @@ def render_rank_goal(new_df, cur_rank, my_new):
     )
 
 
+def _build_ranking(lb_df, metric_col):
+    """Рейтинг по метрике среди всех партнёров: фильтр >0, сортировка по убыванию, ранги 1..N."""
+    r = lb_df[lb_df[metric_col] > 0].sort_values(metric_col, ascending=False).reset_index(drop=True)
+    r.insert(0, 'rank', range(1, len(r) + 1))
+    return r
+
+
+def _partner_rank(ranking_df, partner_first):
+    """Позиция партнёра в рейтинге (или None, если его нет в этом рейтинге)."""
+    rows = ranking_df[ranking_df['partner'].apply(lambda x: partner_first in str(x).lower())]
+    return int(rows['rank'].iloc[0]) if not rows.empty else None
+
+
+def render_rank_stat_card(icon, title, rank, total, value_str, trend_html=""):
+    """Карточка с позицией партнёра в одном из рейтингов (топ-3 — золотой акцент + медаль)."""
+    if rank is None:
+        inner = ("<div style='font-size:1.8rem; font-weight:800; color:#94a3b8; line-height:1.1;'>—</div>"
+                 "<div style='font-size:12px; color:#94a3b8; margin-top:3px;'>пока нет в рейтинге</div>")
+    else:
+        medal = {1: '🥇', 2: '🥈', 3: '🥉'}.get(rank, '')
+        accent = '#d97706' if rank <= 3 else '#3b82f6'
+        medal_html = f"{medal} " if medal else ""
+        inner = (f"<div style='font-size:1.8rem; font-weight:800; color:{accent}; line-height:1.1;'>"
+                 f"{medal_html}#{rank}"
+                 f"<span style='font-size:0.9rem; color:#94a3b8; font-weight:600;'> / {total}</span></div>"
+                 f"<div style='font-size:12px; color:#cbd5e1; margin-top:4px;'>{value_str}{trend_html}</div>")
+    st.markdown(
+        f"<div style='background:#1e293b80; border:1px solid rgba(255,255,255,0.08); border-radius:12px;"
+        f" padding:14px 16px;'>"
+        f"<div style='font-size:13px; color:#94a3b8; margin-bottom:6px;'>{icon} {title}</div>"
+        f"{inner}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_ranking_table(ranking_df, partner_first, value_col, value_header, value_fmt=str):
+    """Таблица рейтинга: медали для топ-3 и подсветка строки текущего партнёра тёмно-синим."""
+    disp = ranking_df[['rank', 'partner', value_col]].copy()
+    disp[value_col] = disp[value_col].apply(value_fmt)
+    disp['rank'] = disp['rank'].apply(lambda r: {1: '🥇 1', 2: '🥈 2', 3: '🥉 3'}.get(r, str(r)))
+    disp.columns = ["#", "Партнёр", value_header]
+
+    def _hl(row):
+        if partner_first in str(ranking_df.iloc[row.name]['partner']).lower():
+            return ['background-color: #1e3a5f; font-weight: 600'] * len(row)
+        return [''] * len(row)
+
+    st.dataframe(disp.style.apply(_hl, axis=1), use_container_width=True, hide_index=True)
+
+
 def draw_leaderboard(data):
     """Draws partner leaderboard in a separate tab."""
     st.header("🏆 Рейтинг партнёров")
@@ -864,7 +914,10 @@ def draw_leaderboard(data):
         COUNT(DISTINCT CASE
               WHEN c.created_at >= TIMESTAMP(DATE_SUB(DATE(TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)), INTERVAL 1 MONTH))
                AND c.created_at < TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
-              THEN c.customer_id END) as new_prev_month
+              THEN c.customer_id END) as new_prev_month,
+        -- Новый MRR за текущий месяц: сумма MRR клиентов, подключённых в этом месяце
+        ROUND(SUM(CASE WHEN c.created_at >= TIMESTAMP_TRUNC(CURRENT_TIMESTAMP(), MONTH)
+              THEN sub.mrr ELSE 0 END) / 100) as new_mrr_month
     FROM deduped_custs c
     JOIN deduped_subs sub
         ON c.customer_id = sub.customer_id
@@ -880,58 +933,92 @@ def draw_leaderboard(data):
         return
     
     partner_first = data['first_name'].lower()
-    
-    # --- Ranking by NEW clients this month ---
-    st.markdown("#### 🆕 По новым клиентам (этот месяц)")
-    new_df = lb_df[lb_df['new_this_month'] > 0].sort_values('new_this_month', ascending=False).reset_index(drop=True)
-    if not new_df.empty:
-        new_df.insert(0, 'rank', range(1, len(new_df) + 1))
-        
-        my_rows = new_df[new_df['partner'].apply(lambda x: partner_first in x.lower())]
-        if not my_rows.empty:
-            cur_rank = int(my_rows['rank'].iloc[0])
-            my_new = int(my_rows['new_this_month'].iloc[0])
 
-            # --- Правка 1: тренд позиции относительно прошлого месяца ---
-            # Тот же рейтинг, но по new_prev_month. Если партнёра не было в
-            # прошлом месяце (первый месяц участия) — стрелку не показываем.
-            prev_df = lb_df[lb_df['new_prev_month'] > 0].sort_values(
-                'new_prev_month', ascending=False).reset_index(drop=True)
-            prev_df.insert(0, 'prev_rank', range(1, len(prev_df) + 1))
-            prev_rows = prev_df[prev_df['partner'].apply(lambda x: partner_first in x.lower())]
-            trend_html = ""
-            if not prev_rows.empty:
-                prev_rank = int(prev_rows['prev_rank'].iloc[0])
-                delta = prev_rank - cur_rank  # >0 — позиция выросла
-                if delta > 0:
-                    trend_html = (f" <span style='color:#16a34a; font-weight:700;'>▲ +{delta}</span>"
-                                  " <span style='color:#94a3b8;'>с прошлого месяца</span>")
-                elif delta < 0:
-                    trend_html = (f" <span style='color:#dc2626; font-weight:700;'>▼ −{abs(delta)}</span>"
-                                  " <span style='color:#94a3b8;'>с прошлого месяца</span>")
-                else:
-                    trend_html = " <span style='color:#94a3b8; font-weight:700;'>→ без изменений</span>"
-            st.markdown(
-                f"Ваше место: **#{cur_rank}** из {len(new_df)}{trend_html}",
-                unsafe_allow_html=True,
-            )
+    # --- Три рейтинга среди всех партнёров (логика подсчёта не меняется) ---
+    clients_rk = _build_ranking(lb_df, 'total_clients')      # по общему числу клиентов
+    mrr_rk = _build_ranking(lb_df, 'new_mrr_month')          # по новому MRR за месяц
+    new_rk = _build_ranking(lb_df, 'new_this_month')         # по новым клиентам за месяц
 
-            # --- Правка 2: мотивационный блок «До следующего места» ---
-            render_rank_goal(new_df, cur_rank, my_new)
+    rank_clients = _partner_rank(clients_rk, partner_first)
+    rank_mrr = _partner_rank(mrr_rk, partner_first)
+    rank_new = _partner_rank(new_rk, partner_first)
+
+    # Значения партнёра по каждой метрике (для карточек)
+    me = lb_df[lb_df['partner'].apply(lambda x: partner_first in str(x).lower())]
+    my_clients = int(me['total_clients'].iloc[0]) if not me.empty else 0
+    my_new_mrr = float(me['new_mrr_month'].iloc[0]) if not me.empty else 0.0
+    my_new_cnt = int(me['new_this_month'].iloc[0]) if not me.empty else 0
+
+    # Тренд позиции по новым клиентам относительно прошлого месяца.
+    # Если партнёра не было в прошлом месяце (первый месяц) — стрелку не показываем.
+    prev_rk = _build_ranking(lb_df, 'new_prev_month')
+    prev_rank = _partner_rank(prev_rk, partner_first)
+    trend_short, trend_inline = "", ""
+    if rank_new is not None and prev_rank is not None:
+        delta = prev_rank - rank_new  # >0 — позиция выросла
+        if delta > 0:
+            arrow = f"<span style='color:#16a34a; font-weight:700;'>▲ +{delta}</span>"
+            trend_inline = f" {arrow} <span style='color:#94a3b8;'>с прошлого месяца</span>"
+        elif delta < 0:
+            arrow = f"<span style='color:#dc2626; font-weight:700;'>▼ −{abs(delta)}</span>"
+            trend_inline = f" {arrow} <span style='color:#94a3b8;'>с прошлого месяца</span>"
         else:
-            st.markdown("У вас пока нет новых клиентов в этом месяце")
+            arrow = "<span style='color:#94a3b8; font-weight:700;'>→</span>"
+            trend_inline = f" {arrow} <span style='color:#94a3b8;'>без изменений</span>"
+        trend_short = f" {arrow}"
 
-        display_new = new_df[['rank', 'partner', 'new_this_month']].copy()
-        display_new.columns = ["#", "Партнёр", "Новые клиенты"]
-        
-        def highlight_new(row):
-            if partner_first in str(new_df.iloc[row.name]['partner']).lower():
-                return ['background-color: #1e3a5f'] * len(row)
-            return [''] * len(row)
-        
-        st.dataframe(display_new.style.apply(highlight_new, axis=1), use_container_width=True, hide_index=True)
-    else:
-        st.info("В этом месяце пока нет продаж.")
+    # --- 3 карточки с позициями партнёра среди всех ---
+    st.caption("Ваши позиции среди всех партнёров")
+    cc1, cc2, cc3 = st.columns(3)
+    with cc1:
+        render_rank_stat_card("👥", "По числу клиентов", rank_clients, len(clients_rk),
+                              f"{my_clients} клиентов в базе")
+    with cc2:
+        render_rank_stat_card("💰", "По новому MRR (этот месяц)", rank_mrr, len(mrr_rk),
+                              f"{fmt_uzs(my_new_mrr)} сум за месяц")
+    with cc3:
+        render_rank_stat_card("🆕", "По новым клиентам (этот месяц)", rank_new, len(new_rk),
+                              f"{my_new_cnt} в этом месяце", trend_short)
+
+    # --- Мотивационный блок «До следующего места» (по новым клиентам) ---
+    if rank_new is not None:
+        render_rank_goal(new_rk, rank_new, my_new_cnt)
+
+    st.write("")
+
+    # --- 3 таблицы-карточки ---
+    with st.container(border=True):
+        st.markdown("##### 🆕 По новым клиентам — этот месяц")
+        if not new_rk.empty:
+            if rank_new is not None:
+                st.markdown(f"Ваше место: **#{rank_new}** из {len(new_rk)}{trend_inline}", unsafe_allow_html=True)
+            else:
+                st.caption("У вас пока нет новых клиентов в этом месяце")
+            render_ranking_table(new_rk, partner_first, 'new_this_month', "Новые клиенты", value_fmt=int)
+        else:
+            st.info("В этом месяце пока нет новых подключений.")
+
+    with st.container(border=True):
+        st.markdown("##### 💰 По новому MRR — этот месяц")
+        if not mrr_rk.empty:
+            if rank_mrr is not None:
+                st.markdown(f"Ваше место: **#{rank_mrr}** из {len(mrr_rk)}", unsafe_allow_html=True)
+            else:
+                st.caption("У вас пока нет нового MRR в этом месяце")
+            render_ranking_table(mrr_rk, partner_first, 'new_mrr_month', "Новый MRR (сум)", value_fmt=fmt_uzs)
+        else:
+            st.info("В этом месяце пока нет нового MRR.")
+
+    with st.container(border=True):
+        st.markdown("##### 👥 По общему числу клиентов")
+        if not clients_rk.empty:
+            if rank_clients is not None:
+                st.markdown(f"Ваше место: **#{rank_clients}** из {len(clients_rk)}", unsafe_allow_html=True)
+            else:
+                st.caption("У вас пока нет активных клиентов")
+            render_ranking_table(clients_rk, partner_first, 'total_clients', "Клиентов", value_fmt=int)
+        else:
+            st.info("Нет данных по клиентам.")
 
 
 # --- ADMIN DASHBOARD ---
