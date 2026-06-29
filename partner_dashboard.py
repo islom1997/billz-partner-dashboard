@@ -1,10 +1,14 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import datetime
 import math
 from google.cloud import bigquery
 import numpy as np
 import plotly.express as px
+
+# Метка для перехода на вкладку «Мои клиенты» с фильтром по неактивным клиентам
+INACTIVE_LABEL = "Неактивные (>4 дн)"
 
 # --- CONFIG ---
 st.set_page_config(
@@ -126,6 +130,46 @@ def retention_status(retention_pct, required):
     if gap <= 5:
         return f"не хватает {gap:.0f} п.п.", "#f59e0b"
     return "ниже порога", "#dc2626"
+
+
+def render_retention_card(retention_pct, required):
+    """Карточка статуса Retention (Правка 1 ТЗ).
+
+    Логика порога НЕ меняется — статус берётся из retention_status(). Меняется
+    только визуал: при retention ≥ порога — зелёная галочка ✅ (как сейчас);
+    при retention < порога — тревожная иконка ⚠️ с красно-оранжевым акцентом и
+    фоном (как бейдж «в зоне риска»). Когда порог не требуется / нет данных —
+    нейтральный вид.
+    """
+    status_text, status_color = retention_status(retention_pct, required)
+    has_threshold = required is not None and retention_pct is not None
+    met = has_threshold and retention_pct >= required
+    below = has_threshold and retention_pct < required
+
+    ret_display = f"{retention_pct:.0f}%" if retention_pct is not None else "нет данных"
+    icon = "✅" if met else ("⚠️" if below else "")
+    icon_html = f"{icon} " if icon else ""
+    # Тревожный фон и рамка только когда retention ниже порога; иначе карточка
+    # выглядит как соседние метрики (без рамки).
+    if below:
+        box_style = (
+            f"background:{status_color}1f; border:1px solid {status_color}; "
+            "border-radius:10px; padding:10px 14px;"
+        )
+    else:
+        box_style = "padding:2px 0;"
+    value_color = status_color if (met or below) else "inherit"
+
+    st.markdown(
+        f"""
+        <div style="{box_style}">
+          <div style="font-size:13px; color:#9aa0aa;">Retention (6 мес)</div>
+          <div style="font-size:1.9rem; font-weight:600; line-height:1.25; color:{value_color};">{icon_html}{ret_display}</div>
+          <div style="font-size:13px; color:{status_color}; font-weight:600;">{status_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # --- AUTHENTICATION ---
@@ -434,112 +478,118 @@ def draw_grade_section(data):
         delta = f"+{fmt_uzs(mrr_gap)} сум" if (nxt and mrr_gap > 0) else ("✓ выполнено" if nxt else "макс. уровень")
         st.metric("Partner MRR", f"{fmt_uzs(mrr)} сум", delta, delta_color="off")
     with c3:
-        ret_display = f"{ret:.0f}%" if ret is not None else "нет данных"
         req_for_status = nxt["min_retention"] if nxt else (cur["min_retention"] if cur else None)
-        status_text, _ = retention_status(ret, req_for_status)
-        st.metric("Retention (6 мес)", ret_display, status_text, delta_color="off")
+        render_retention_card(ret, req_for_status)
 
     st.write("")
 
-    if nxt:
-        # --- Прогресс до следующего уровня (4.2) ---
-        st.markdown(f"##### Прогресс до Level {nxt['level']} — {nxt['name']}")
-        render_progress_bar("Active clients", active, nxt["min_clients"])
-        render_progress_bar("Partner MRR", mrr, nxt["min_mrr"], "сум")
-        status_text, status_color = retention_status(ret, nxt["min_retention"])
-        ret_display = f"{ret:.0f}%" if ret is not None else "нет данных"
-        st.markdown(
-            f"<div style='font-size:13px; margin-top:2px;'><b>Retention:</b> {ret_display} — "
-            f"<span style='color:{status_color}; font-weight:600;'>{status_text}</span></div>",
-            unsafe_allow_html=True,
-        )
-
-        # --- Сколько осталось (4.1, текст под таблицей) ---
-        remaining_parts = []
-        if clients_gap > 0:
-            remaining_parts.append(f"подключить {clients_gap} активных клиентов")
-        if mrr_gap > 0:
-            remaining_parts.append(f"увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум")
-        st.write("")
-        if remaining_parts:
-            st.markdown(f"До **Level {nxt['level']} — {nxt['name']}** осталось: " + " и ".join(remaining_parts) + ".")
-        else:
-            st.success(f"Все требования для Level {nxt['level']} — {nxt['name']} выполнены. Уровень обновится после ближайшего пересчёта.")
-    else:
-        st.success(f"🏆 Достигнут максимальный уровень — {cur['name']}. Поздравляем!")
-
-    # --- Retention health для текущего уровня: grace period (2.1 / 2.2) ---
+    # --- Жёлтый баннер: retention ниже порога текущего уровня (Правка 2) ---
+    # Текст баннера НЕ меняется. Добавлена только кнопка перехода к неактивным
+    # клиентам на вкладке «Мои клиенты» с предустановленным фильтром.
     if cur and cur["min_retention"] is not None and ret is not None and ret < cur["min_retention"]:
         st.warning(
             f"⚠️ Retention {ret:.0f}% ниже порога вашего уровня ({cur['min_retention']}%). "
             "Действует grace period 2 месяца на восстановление — уровень и бенефиты пока сохраняются."
         )
+        if st.button("🔎 Посмотреть неактивных клиентов →", key="goto_inactive_from_grade"):
+            st.session_state["activity_select"] = INACTIVE_LABEL
+            st.session_state["_switch_to_clients"] = True
+        st.write("")
 
-    st.write("---")
-
-    # --- Разблокированные преимущества (4.3) ---
-    col_now, col_next = st.columns(2)
-    with col_now:
-        st.markdown("##### ✅ Доступно сейчас" + (f" — Level {cur['level']}" if cur else ""))
-        if cur:
-            for b in cur["benefits"]:
-                st.markdown(f"- {b}")
-        else:
-            st.caption("Бенефиты станут доступны после достижения Level 1 — Starter.")
-    with col_next:
+    # --- Roadmap уровней (Правка 3: свёрнут под аккордеон по умолчанию) ---
+    with st.expander("🗺 Roadmap уровней", expanded=False):
         if nxt:
-            st.markdown(f"##### 🔓 Откроется на Level {nxt['level']} — {nxt['name']}")
-            for b in nxt["benefits"]:
-                st.markdown(f"- {b}")
-        else:
-            st.markdown("##### 🔓 Следующий уровень")
-            st.caption("Вы на максимальном уровне — дальше только удержание Elite-статуса.")
+            # --- Прогресс до следующего уровня (4.2) ---
+            st.markdown(f"##### Прогресс до Level {nxt['level']} — {nxt['name']}")
+            render_progress_bar("Active clients", active, nxt["min_clients"])
+            render_progress_bar("Partner MRR", mrr, nxt["min_mrr"], "сум")
+            status_text, status_color = retention_status(ret, nxt["min_retention"])
+            ret_display = f"{ret:.0f}%" if ret is not None else "нет данных"
+            st.markdown(
+                f"<div style='font-size:13px; margin-top:2px;'><b>Retention:</b> {ret_display} — "
+                f"<span style='color:{status_color}; font-weight:600;'>{status_text}</span></div>",
+                unsafe_allow_html=True,
+            )
 
-    st.write("---")
-
-    # --- Next Best Action (4.4) ---
-    st.markdown("##### 🎯 Что сделать дальше")
-    if nxt:
-        # Главное действие — наибольший относительный разрыв
-        primary_candidates = []
-        if clients_gap > 0:
-            primary_candidates.append((clients_gap / nxt["min_clients"], f"Подключить ещё {clients_gap} активных клиентов"))
-        if mrr_gap > 0:
-            primary_candidates.append((mrr_gap / nxt["min_mrr"], f"Увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум"))
-        if nxt["min_retention"] is not None and ret is not None and ret < nxt["min_retention"]:
-            primary_candidates.append(((nxt["min_retention"] - ret) / nxt["min_retention"], f"Поднять retention до {nxt['min_retention']}%"))
-        if primary_candidates:
-            primary = max(primary_candidates, key=lambda x: x[0])[1]
-            st.info(f"**Главное действие:** {primary} — это ближайший шаг к Level {nxt['level']}.")
-
-        actions = []
-        if clients_gap > 0:
-            actions.append(f"Подключите ещё {clients_gap} активных клиентов, чтобы выполнить требование по клиентам для Level {nxt['level']}.")
-        if mrr_gap > 0:
-            actions.append(f"Увеличьте Partner MRR на {fmt_uzs(mrr_gap)} сум, чтобы выполнить MRR-требование для Level {nxt['level']}.")
-        if nxt["min_retention"] is not None:
-            if ret is None:
-                actions.append(f"Недостаточно данных по retention. Требование для Level {nxt['level']} — {nxt['min_retention']}%.")
-            elif ret >= nxt["min_retention"]:
-                actions.append(f"Retention сейчас {ret:.0f}%. Требование для Level {nxt['level']} — {nxt['min_retention']}%, условие уже выполнено.")
+            # --- Сколько осталось (4.1, текст под таблицей) ---
+            remaining_parts = []
+            if clients_gap > 0:
+                remaining_parts.append(f"подключить {clients_gap} активных клиентов")
+            if mrr_gap > 0:
+                remaining_parts.append(f"увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум")
+            st.write("")
+            if remaining_parts:
+                st.markdown(f"До **Level {nxt['level']} — {nxt['name']}** осталось: " + " и ".join(remaining_parts) + ".")
             else:
-                actions.append(f"Поднимите retention с {ret:.0f}% до {nxt['min_retention']}% — удерживайте текущих клиентов в ближайшие месяцы.")
-        if mrr_gap > 0 and active > 0:
-            avg_mrr = mrr / active
-            if avg_mrr > 0:
-                need_clients = math.ceil(mrr_gap / avg_mrr)
-                actions.append(
-                    f"Средний MRR на клиента сейчас {fmt_uzs(avg_mrr)} сум. Чтобы добрать {fmt_uzs(mrr_gap)} сум MRR, "
-                    f"нужно примерно {need_clients} новых клиентов с таким же средним чеком."
-                )
-        for a in actions:
-            st.markdown(f"- {a}")
-    else:
-        st.info("**Главное действие:** удерживайте retention и активную базу, чтобы сохранить статус Elite.")
-        st.markdown(
-            "- Критерии статуса «Партнёр года»: рост Partner MRR, retention, NPS клиентов, "
-            "выполнение квартальных планов, качество обработки лидов."
-        )
+                st.success(f"Все требования для Level {nxt['level']} — {nxt['name']} выполнены. Уровень обновится после ближайшего пересчёта.")
+        else:
+            st.success(f"🏆 Достигнут максимальный уровень — {cur['name']}. Поздравляем!")
+
+        st.write("---")
+
+        # --- Разблокированные преимущества (4.3) ---
+        col_now, col_next = st.columns(2)
+        with col_now:
+            st.markdown("##### ✅ Доступно сейчас" + (f" — Level {cur['level']}" if cur else ""))
+            if cur:
+                for b in cur["benefits"]:
+                    st.markdown(f"- {b}")
+            else:
+                st.caption("Бенефиты станут доступны после достижения Level 1 — Starter.")
+        with col_next:
+            if nxt:
+                st.markdown(f"##### 🔓 Откроется на Level {nxt['level']} — {nxt['name']}")
+                for b in nxt["benefits"]:
+                    st.markdown(f"- {b}")
+            else:
+                st.markdown("##### 🔓 Следующий уровень")
+                st.caption("Вы на максимальном уровне — дальше только удержание Elite-статуса.")
+
+        st.write("---")
+
+        # --- Next Best Action (4.4) ---
+        st.markdown("##### 🎯 Что сделать дальше")
+        if nxt:
+            # Главное действие — наибольший относительный разрыв
+            primary_candidates = []
+            if clients_gap > 0:
+                primary_candidates.append((clients_gap / nxt["min_clients"], f"Подключить ещё {clients_gap} активных клиентов"))
+            if mrr_gap > 0:
+                primary_candidates.append((mrr_gap / nxt["min_mrr"], f"Увеличить Partner MRR на {fmt_uzs(mrr_gap)} сум"))
+            if nxt["min_retention"] is not None and ret is not None and ret < nxt["min_retention"]:
+                primary_candidates.append(((nxt["min_retention"] - ret) / nxt["min_retention"], f"Поднять retention до {nxt['min_retention']}%"))
+            if primary_candidates:
+                primary = max(primary_candidates, key=lambda x: x[0])[1]
+                st.info(f"**Главное действие:** {primary} — это ближайший шаг к Level {nxt['level']}.")
+
+            actions = []
+            if clients_gap > 0:
+                actions.append(f"Подключите ещё {clients_gap} активных клиентов, чтобы выполнить требование по клиентам для Level {nxt['level']}.")
+            if mrr_gap > 0:
+                actions.append(f"Увеличьте Partner MRR на {fmt_uzs(mrr_gap)} сум, чтобы выполнить MRR-требование для Level {nxt['level']}.")
+            if nxt["min_retention"] is not None:
+                if ret is None:
+                    actions.append(f"Недостаточно данных по retention. Требование для Level {nxt['level']} — {nxt['min_retention']}%.")
+                elif ret >= nxt["min_retention"]:
+                    actions.append(f"Retention сейчас {ret:.0f}%. Требование для Level {nxt['level']} — {nxt['min_retention']}%, условие уже выполнено.")
+                else:
+                    actions.append(f"Поднимите retention с {ret:.0f}% до {nxt['min_retention']}% — удерживайте текущих клиентов в ближайшие месяцы.")
+            if mrr_gap > 0 and active > 0:
+                avg_mrr = mrr / active
+                if avg_mrr > 0:
+                    need_clients = math.ceil(mrr_gap / avg_mrr)
+                    actions.append(
+                        f"Средний MRR на клиента сейчас {fmt_uzs(avg_mrr)} сум. Чтобы добрать {fmt_uzs(mrr_gap)} сум MRR, "
+                        f"нужно примерно {need_clients} новых клиентов с таким же средним чеком."
+                    )
+            for a in actions:
+                st.markdown(f"- {a}")
+        else:
+            st.info("**Главное действие:** удерживайте retention и активную базу, чтобы сохранить статус Elite.")
+            st.markdown(
+                "- Критерии статуса «Партнёр года»: рост Partner MRR, retention, NPS клиентов, "
+                "выполнение квартальных планов, качество обработки лидов."
+            )
 
 
 def draw_main_dashboard(data):
@@ -1001,10 +1051,12 @@ def main():
                     index=0
                 )
             with col_a:
+                # key="activity_select" — чтобы кнопка из баннера (Правка 2) могла
+                # заранее установить фильтр «Неактивные (>4 дн)» через session_state.
                 selected_activity = st.selectbox(
                     "Активность",
-                    options=["Все", "Активные (≤1 дн)", "В зоне риска (2-4 дн)", "Неактивные (>4 дн)", "Нет данных"],
-                    index=0
+                    options=["Все", "Активные (≤1 дн)", "В зоне риска (2-4 дн)", INACTIVE_LABEL, "Нет данных"],
+                    key="activity_select"
                 )
             
             # Build a query for all active clients directly from Chargebee
@@ -1197,17 +1249,33 @@ def main():
                     activity_counts = filtered_df[filtered_df['Активность'] != 'Нет данных']['Активность'].value_counts().reset_index()
                     activity_counts.columns = ['Активность', 'Количество']
                     if not activity_counts.empty:
-                        fig = px.pie(activity_counts, names='Активность', values='Количество', 
-                                     hole=0.5, color='Активность',
-                                     color_discrete_map={
-                                         'Активные (≤1 дн)': '#16A34A', 
-                                         'В зоне риска (2-4 дн)': '#F59E0B', 
-                                         'Неактивные (>4 дн)': '#DC2626'
-                                     })
+                        # Правка 4: в легенде рядом с процентом показываем число клиентов.
+                        # Цвета и порядок сегментов не меняются — данные те же.
+                        seg_colors = {
+                            'Активные (≤1 дн)': '#16A34A',
+                            'В зоне риска (2-4 дн)': '#F59E0B',
+                            INACTIVE_LABEL: '#DC2626',
+                        }
+                        total_clients = int(activity_counts['Количество'].sum())
+                        activity_counts['Легенда'] = activity_counts.apply(
+                            lambda r: f"{r['Активность']}: {int(r['Количество'])} клиентов · "
+                                      f"{r['Количество'] / total_clients * 100:.1f}%",
+                            axis=1,
+                        )
+                        legend_colors = {
+                            row['Легенда']: seg_colors.get(row['Активность'], '#94A3B8')
+                            for _, row in activity_counts.iterrows()
+                        }
+                        fig = px.pie(activity_counts, names='Легенда', values='Количество',
+                                     hole=0.5, color='Легенда',
+                                     color_discrete_map=legend_colors)
+                        # На секторах оставляем только проценты — подробности в легенде
+                        fig.update_traces(textinfo='percent', textposition='inside')
                         fig.update_layout(
                             margin=dict(t=0, b=0, l=0, r=0),
                             height=200,
                             showlegend=True,
+                            legend=dict(font=dict(size=11)),
                             paper_bgcolor='rgba(0,0,0,0)',
                             plot_bgcolor='rgba(0,0,0,0)'
                         )
@@ -1408,6 +1476,24 @@ def main():
                 st.dataframe(display_payouts, use_container_width=True, hide_index=True)
             else:
                 st.info("Нет оплаченных счетов за выбранный месяц.")
+
+        # --- Правка 2: переход на вкладку «Мои клиенты» по кнопке из баннера ---
+        # st.tabs нельзя переключить из Python, поэтому кликаем по нужной вкладке
+        # через JS. Фильтр «Неактивные (>4 дн)» уже выставлен в
+        # session_state["activity_select"] обработчиком кнопки выше.
+        if st.session_state.pop("_switch_to_clients", False):
+            components.html(
+                """
+                <script>
+                  const go = () => {
+                    const tabs = window.parent.document.querySelectorAll('button[data-baseweb="tab"]');
+                    if (tabs && tabs.length > 1) { tabs[1].click(); }
+                  };
+                  setTimeout(go, 150);
+                </script>
+                """,
+                height=0,
+            )
 
 if __name__ == "__main__":
     main()
